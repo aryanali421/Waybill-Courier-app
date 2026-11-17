@@ -609,7 +609,7 @@ st.markdown(
 )
 
 tab_overview, tab_profiles, tab_image, tab_comments, tab_summary = st.tabs([
-    "Overview & estimate",
+    "Delivery overview and duration estimate",
     "Delivery profiles",
     "Vehicle image",
     "Customer comments",
@@ -821,7 +821,7 @@ with tab_profiles:
             unsafe_allow_html=True,
         )
     else:
-        st.info("Estimate a job in **Overview & estimate** to see which profile it belongs to.")
+        st.info("Estimate a job in **Delivery overview and duration estimate** to see which profile it belongs to.")
 
     cards = []
     for g, r in profile_table.iterrows():
@@ -1180,7 +1180,7 @@ with tab_summary:
 
     if estimate is None:
         st.info("No duration estimate yet — the summary uses the comments only. Estimate a job "
-                "in **Overview & estimate** to include it.")
+                "in **Delivery overview and duration estimate** to include it.")
 
     mode = st.radio("Summary type", ["Offline summary", "AI summary · Groq Free Plan"],
                     horizontal=True, key="summary_mode",
