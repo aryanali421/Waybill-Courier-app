@@ -446,11 +446,11 @@ html { scroll-behavior: smooth; }
 [data-testid="collapsedControl"] { display:none !important; }
 header[data-testid="stHeader"], [data-testid="stAppViewContainer"], [data-testid="stMain"],
 .main { background: transparent !important; }
-[data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
+.stApp { isolation: isolate; }
 footer { visibility:hidden; }
 
 /* ---------- animated background ---------- */
-.stApp::before { content:""; position:fixed; inset:-20%; z-index:0; pointer-events:none;
+.stApp::before { content:""; position:fixed; inset:-20%; z-index:-1; pointer-events:none;
   background:
     radial-gradient(38% 34% at 18% 22%, rgba(249,115,22,.22), transparent 70%),
     radial-gradient(34% 32% at 82% 18%, rgba(14,165,233,.18), transparent 70%),
