@@ -12,7 +12,7 @@ summary is optional and falls back to the offline summary on any error.
 from __future__ import annotations
 
 import hashlib
-import html
+import html as html_lib
 import io
 import json
 import os
@@ -79,10 +79,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
+def html(body: str) -> None:
+    """Render custom HTML. Indentation and blank lines are removed first: Markdown would
+    otherwise turn indented lines after a blank line into a code block and show raw tags."""
+    cleaned = "\n".join(line.strip() for line in str(body).splitlines() if line.strip())
+    st.markdown(cleaned, unsafe_allow_html=True)
+
+
 # --------------------------------------------------------------------------
 # Visual style — theme-aware (works in light and dark mode)
 # --------------------------------------------------------------------------
-st.markdown(
+html(
     """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -183,24 +191,23 @@ header[data-testid="stHeader"] { background: transparent; }
 footer { visibility:hidden; }
 </style>
 """,
-    unsafe_allow_html=True,
 )
 
 
 def esc(value) -> str:
-    """Escape any text before it goes inside custom HTML."""
-    return html.escape(str(value))
+    """Escape any text before it goes inside custom HTML (line breaks become <br>)."""
+    return html_lib.escape(str(value)).replace("\n", "<br>")
 
 
 def section(eyebrow: str, title: str, lead: str = "") -> None:
     lead_html = f'<div class="wb-lead">{esc(lead)}</div>' if lead else ""
-    st.markdown(f'<div class="wb-eyebrow">{esc(eyebrow)}</div>'
-                f'<div class="wb-title">{esc(title)}</div>{lead_html}', unsafe_allow_html=True)
+    html(f'<div class="wb-eyebrow">{esc(eyebrow)}</div>'
+                f'<div class="wb-title">{esc(title)}</div>{lead_html}')
 
 
 def subhead(title: str, note: str = "") -> None:
     note_html = f' <span class="wb-muted">· {esc(note)}</span>' if note else ""
-    st.markdown(f'<div class="wb-sub">{esc(title)}{note_html}</div>', unsafe_allow_html=True)
+    html(f'<div class="wb-sub">{esc(title)}{note_html}</div>')
 
 
 def show_chart(chart) -> None:
@@ -587,7 +594,7 @@ def example_label(record_id: str) -> str:
 estimate_now = st.session_state.get("estimate")
 estimate_chip = (f'<span class="wb-chip accent">Current job · {estimate_now["minutes"]:.1f} min</span>'
                  if estimate_now else "")
-st.markdown(
+html(
     f"""
 <div class="wb-hero">
   <div class="wb-brand">
@@ -605,7 +612,6 @@ st.markdown(
   </div>
 </div>
 """,
-    unsafe_allow_html=True,
 )
 
 tab_overview, tab_profiles, tab_image, tab_comments, tab_summary = st.tabs([
@@ -670,7 +676,7 @@ with tab_overview:
             mae_txt = (f"Typical model error on held-out test jobs: about ±{mae:.1f} min. "
                        if mae is not None else "")
             stale = validate_record(current_form_record())[0] != rec
-            st.markdown(
+            html(
                 f"""
 <div class="wb-card hl">
   <div class="lbl">Estimated delivery duration</div>
@@ -689,13 +695,12 @@ with tab_overview:
   <div class="wb-muted" style="margin-top:.7rem">Calculated at {estimate['time']}</div>
 </div>
 """,
-                unsafe_allow_html=True,
             )
             if stale:
                 st.warning("The job details changed after this estimate. Press **Estimate "
                            "duration** again to update it.")
         else:
-            st.markdown(
+            html(
                 """
 <div class="wb-card wb-empty">
   <div class="ic">⏱</div>
@@ -704,14 +709,13 @@ with tab_overview:
   <b>Estimate duration</b>.</div>
 </div>
 """,
-                unsafe_allow_html=True,
             )
 
     st.write("")
     section("Data overview", "Supplied delivery records",
             "Generated classroom scenarios. Charts use the training rows; durations are in minutes.")
     split_counts = MAIN["split"].value_counts()
-    st.markdown(
+    html(
         f"""
 <div class="wb-kpis">
   <div class="wb-kpi"><div class="k">Records</div><div class="v">{len(MAIN):,}</div>
@@ -726,7 +730,6 @@ with tab_overview:
     <div class="h">training rows</div></div>
 </div>
 """,
-        unsafe_allow_html=True,
     )
 
     c1, c2 = st.columns(2, gap="large")
@@ -763,10 +766,9 @@ with tab_overview:
             st.dataframe(MAIN.head(100), hide_index=True, use_container_width=True)
     with e2:
         with st.expander("Check a CSV of jobs"):
-            st.markdown(
+            html(
                 '<div class="wb-muted">Required columns: <code>' + esc(", ".join(FEATURES))
                 + "</code>. Incomplete rows are rejected, not filled in.</div>",
-                unsafe_allow_html=True,
             )
             upload = st.file_uploader("CSV file", type=["csv"], key="csv_upload",
                                       label_visibility="collapsed")
@@ -814,11 +816,10 @@ with tab_profiles:
     estimate = st.session_state.get("estimate")
 
     if estimate:
-        st.markdown(
+        html(
             f'<div class="wb-card hl"><div class="lbl">Current job</div>'
             f'<div class="wb-text" style="margin-top:.35rem"><span class="wb-badge grp">'
             f'Group {estimate["group"]}</span>{esc(group_text(estimate["group"]))}</div></div>',
-            unsafe_allow_html=True,
         )
     else:
         st.info("Estimate a job in **Delivery overview and duration estimate** to see which profile it belongs to.")
@@ -834,8 +835,8 @@ with tab_profiles:
             f'<div class="h" style="margin-top:.45rem">{r["distance_km"]:.1f} km · '
             f'{r["weight_kg"]:.1f} kg · traffic {r["traffic_index"]:.1f} · '
             f'{r["stops_count"]:.1f} stops</div></div>')
-    st.markdown('<div class="wb-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">'
-                + "".join(cards) + "</div>", unsafe_allow_html=True)
+    html('<div class="wb-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">'
+                + "".join(cards) + "</div>")
 
     plot_col, table_col = st.columns([1.5, 1], gap="large")
     with plot_col:
@@ -874,11 +875,10 @@ with tab_profiles:
                 "stops_count": "stops"})
             shown.index = [f"Group {g}" for g in shown.index]
             st.dataframe(shown, use_container_width=True)
-            st.markdown(
+            html(
                 '<div class="wb-muted">The chart shows two of the four features, so some '
                 "overlap is expected. Group numbers are labels, not a ranking. Grouping similar "
                 "jobs is not route optimisation and does not prove a cause.</div>",
-                unsafe_allow_html=True,
             )
 
 # ==========================================================================
@@ -929,11 +929,10 @@ with tab_image:
                 p2.image(enlarge(small, 220),
                          caption=f"Model input · {IMAGE_SHAPE[0]}×{IMAGE_SHAPE[1]} RGB",
                          use_container_width=True)
-                st.markdown(
+                html(
                     f'<div class="wb-muted">Shape (1, {IMAGE_SHAPE[0]}, {IMAGE_SHAPE[1]}, '
                     f'{IMAGE_SHAPE[2]}), pixel values 0–255 (the model rescales once). '
                     f'Class order: {esc(", ".join(IMAGE_CLASSES))}.</div>',
-                    unsafe_allow_html=True,
                 )
         with right:
             suggestion = None
@@ -944,13 +943,12 @@ with tab_image:
                 scores = model.predict(batch, verbose=0)[0]
                 best = int(np.argmax(scores))
                 suggestion = IMAGE_CLASSES[best]
-                st.markdown(
+                html(
                     f'<div class="wb-card hl"><div class="lbl">Model suggestion</div>'
                     f'<div class="wb-big">{esc(suggestion.capitalize())}'
                     f'<span>score {scores[best]:.2f}</span></div>'
                     f'<div class="wb-muted">A score is not a calibrated probability, and the model '
                     "cannot recognise objects outside its two classes.</div></div>",
-                    unsafe_allow_html=True,
                 )
                 score_frame = pd.DataFrame({"class": [c.capitalize() for c in IMAGE_CLASSES],
                                             "score": [float(s) for s in scores]})
@@ -993,12 +991,11 @@ with tab_image:
     elif not problem and source != "Supplied sample":
         st.info("Upload a PNG or JPG image (up to 5 MB), or switch to a supplied sample.")
 
-    st.markdown(
+    html(
         '<div class="wb-muted" style="margin-top:.6rem">The models were trained on small, '
         "low-resolution CIFAR-10 images. They do not identify owners, registration numbers, "
         "damage or road conditions and can be wrong on real photos, so the worker always "
         "confirms the vehicle.</div>",
-        unsafe_allow_html=True,
     )
 
 # ==========================================================================
@@ -1022,7 +1019,7 @@ with tab_comments:
             kw = f"“{esc(keyword)}”" if keyword else "none"
             shown_text = esc(text) if str(text).strip() else "<i>(blank comment)</i>"
             cols = 4 if reference else 3
-            st.markdown(
+            html(
                 f"""
 <div class="wb-card hl">
   <div class="lbl">Comment</div>
@@ -1035,7 +1032,6 @@ with tab_comments:
   </div>
 </div>
 """,
-                unsafe_allow_html=True,
             )
 
         pick_col, write_col = st.columns(2, gap="large")
@@ -1081,7 +1077,7 @@ with tab_comments:
 
         counts, topics, n_scored, n_empty = comment_totals(table)
         extra = len(st.session_state["session_comments"])
-        st.markdown(
+        html(
             f"""
 <div class="wb-kpis">
   <div class="wb-kpi"><div class="k">Comments scored</div><div class="v">{n_scored}</div>
@@ -1091,7 +1087,6 @@ with tab_comments:
   <div class="wb-kpi" style="border-top:4px solid {RED}"><div class="k">Negative</div><div class="v">{counts['negative']}</div></div>
 </div>
 """,
-            unsafe_allow_html=True,
         )
 
         ch1, ch2 = st.columns(2, gap="large")
@@ -1155,11 +1150,10 @@ with tab_comments:
                                     "matched_keyword"]],
                              hide_index=True, use_container_width=True)
 
-        st.markdown(
+        html(
             '<div class="wb-muted">Sentiment describes tone and topics describe subject matter; '
             "neither is full understanding. Negation, sarcasm and mixed opinions can be misread. "
             "English only — Urdu and Roman Urdu are outside this baseline.</div>",
-            unsafe_allow_html=True,
         )
 
 # ==========================================================================
@@ -1187,9 +1181,9 @@ with tab_summary:
                     help="The offline summary needs no API key and is always available.")
 
     def show_offline() -> None:
-        st.markdown(f'<div class="wb-card"><div class="lbl" style="margin-bottom:.5rem">Offline '
-                    f'summary · fixed template</div><div class="wb-summary">{esc(offline_text)}'
-                    "</div></div>", unsafe_allow_html=True)
+        html(f'<div class="wb-card"><div class="lbl" style="margin-bottom:.5rem">Offline '
+                    f'summary · fixed template</div><div class="wb-summary">{esc(offline_text).replace("  ", "&nbsp;&nbsp;")}'
+                    "</div></div>")
         st.download_button("Download summary (.txt)", offline_text,
                            file_name="waybill_offline_summary.txt", mime="text/plain")
 
@@ -1203,13 +1197,12 @@ with tab_summary:
         with st.container(border=True):
             i1, i2 = st.columns([1.6, 1], gap="large")
             with i1:
-                st.markdown(
+                html(
                     '<div class="wb-muted">One request is sent only when you press the button. '
                     "It contains calculated totals — no comment text, images or files. The model "
                     "is asked for one observation, two actions and one limitation in under 120 "
                     f'words. Model: <code>{esc(model_id)}</code>. Key: '
                     f'{"set" if api_key else "<b>not set</b>"}.</div>',
-                    unsafe_allow_html=True,
                 )
                 simulate_failure = st.toggle(
                     "Test mode: simulate an API failure", value=False, key="simulate_failure",
@@ -1250,10 +1243,9 @@ with tab_summary:
                 st.warning("The results changed after this AI summary was made. Press "
                            "**Generate AI summary** to update it.")
             with st.container(border=True):
-                st.markdown(f'<div class="lbl" style="font-size:.74rem;font-weight:600;'
+                html(f'<div class="lbl" style="font-size:.74rem;font-weight:600;'
                             f'letter-spacing:.06em;text-transform:uppercase;opacity:.62">'
-                            f"AI-generated · Groq · {ai['time']} · {words} words</div>",
-                            unsafe_allow_html=True)
+                            f"AI-generated · Groq · {ai['time']} · {words} words</div>")
                 st.markdown(ai["text"])
             st.caption("Generated text can contain mistakes. Check every number against the "
                        "calculated results, which come from the saved models.")
@@ -1284,8 +1276,8 @@ with st.expander("About this demo"):
         "This app never trains or refits a model.\n"
         "- **AI summary:** optional, Groq Free Plan only; the offline summary is the default."
     )
-st.markdown(
+html(
     f'<div class="wb-muted" style="text-align:center;margin-top:1.2rem">{APP_NAME} · AI for '
     "Everyone · Project 05 · demonstration data — estimates are not delivery guarantees</div>",
-    unsafe_allow_html=True,
 )
+
