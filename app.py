@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import html as html_lib
 import io
+from contextlib import contextmanager
 import json
 import os
 import re
@@ -96,56 +97,183 @@ html(
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"], .stMarkdown, button, input, textarea, select, label {
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+:root { --wb-accent:#EA580C; --wb-accent2:#F97316; --wb-line: rgba(128,128,128,.22);
+  --wb-soft: rgba(128,128,128,.07); --wb-glass: rgba(128,128,128,.075);
+  --wb-shadow: 0 10px 30px rgba(15,23,42,.10); --wb-ease: cubic-bezier(.22,.8,.3,1); }
+
+/* ---------- layout ---------- */
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1080px; }
 [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] { display: none !important; }
-header[data-testid="stHeader"] { background: transparent; }
-footer { visibility: hidden; }
-:root { --wb-line: rgba(128,128,128,.20); --wb-soft: rgba(128,128,128,.06); --wb-accent: #EA580C; }
-.wb-hero { display:flex; align-items:center; gap:.8rem; margin-bottom:.15rem; }
-.wb-logo { width:40px; height:40px; border-radius:11px; background:var(--wb-accent); color:#fff;
-  display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.15rem; }
-.wb-name { font-size:1.45rem; font-weight:800; letter-spacing:-.02em; line-height:1.15; }
+[data-testid="collapsedControl"] { display:none !important; }
+header[data-testid="stHeader"], [data-testid="stAppViewContainer"], [data-testid="stMain"],
+.main { background: transparent !important; }
+[data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
+footer { visibility:hidden; }
+
+/* ---------- animated background ---------- */
+.stApp::before { content:""; position:fixed; inset:-20%; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(38% 34% at 18% 22%, rgba(249,115,22,.22), transparent 70%),
+    radial-gradient(34% 32% at 82% 18%, rgba(14,165,233,.18), transparent 70%),
+    radial-gradient(40% 38% at 70% 85%, rgba(168,85,247,.14), transparent 72%),
+    radial-gradient(30% 30% at 10% 90%, rgba(34,197,94,.10), transparent 70%);
+  filter: blur(40px); animation: wbDrift 26s ease-in-out infinite alternate; }
+@keyframes wbDrift {
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  50%  { transform: translate3d(3%,-2%,0) scale(1.06); }
+  100% { transform: translate3d(-3%,2%,0) scale(1.02); } }
+
+/* ---------- header ---------- */
+.wb-hero { display:flex; align-items:center; gap:.85rem; margin-bottom:.2rem;
+  animation: wbFade .6s var(--wb-ease) both; }
+.wb-logo { width:44px; height:44px; border-radius:13px; color:#fff; font-weight:800; font-size:1.2rem;
+  display:flex; align-items:center; justify-content:center;
+  background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent));
+  box-shadow: 0 8px 22px rgba(234,88,12,.35), inset 0 1px 0 rgba(255,255,255,.35);
+  animation: wbFloat 6s ease-in-out infinite; }
+@keyframes wbFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.wb-name { font-size:1.55rem; font-weight:800; letter-spacing:-.025em; line-height:1.1; }
 .wb-tag { font-size:.9rem; opacity:.65; }
-.wb-title { font-size:1.2rem; font-weight:700; letter-spacing:-.01em; margin:.1rem 0 .1rem 0; }
-.wb-lead { font-size:.92rem; opacity:.65; margin-bottom:1rem; }
-.wb-label { font-size:.72rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; opacity:.55; }
-.wb-big { font-size:3rem; font-weight:800; letter-spacing:-.03em; line-height:1.05;
-  font-variant-numeric: tabular-nums; margin:.25rem 0 .2rem 0; }
-.wb-big span { font-size:1rem; font-weight:600; opacity:.55; margin-left:.35rem; letter-spacing:0; }
+
+/* ---------- text ---------- */
+.wb-title { font-size:1.25rem; font-weight:700; letter-spacing:-.015em; margin:.1rem 0 .1rem 0;
+  animation: wbFade .5s var(--wb-ease) both; }
+.wb-lead { font-size:.92rem; opacity:.65; margin-bottom:1.1rem; animation: wbFade .55s var(--wb-ease) both; }
+.wb-label { font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
+.wb-big { font-size:3.1rem; font-weight:800; letter-spacing:-.035em; line-height:1.05; margin:.3rem 0 .2rem 0;
+  font-variant-numeric: tabular-nums; background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation: wbPop .6s var(--wb-ease) both; }
+.wb-big span { font-size:1rem; font-weight:600; margin-left:.35rem; letter-spacing:0;
+  color: rgb(128,128,128); -webkit-text-fill-color: rgb(128,128,128); }
 .wb-note { font-size:.86rem; opacity:.65; line-height:1.5; }
 .wb-row { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.9rem; }
-.wb-tagpill { font-size:.82rem; padding:.28rem .65rem; border-radius:999px; background:var(--wb-soft);
-  border:1px solid var(--wb-line); font-variant-numeric: tabular-nums; }
+.wb-tagpill { font-size:.82rem; padding:.3rem .7rem; border-radius:999px; background:var(--wb-glass);
+  border:1px solid var(--wb-line); font-variant-numeric: tabular-nums; backdrop-filter: blur(6px); }
 .wb-group { margin-top:1rem; padding-top:.9rem; border-top:1px solid var(--wb-line); font-size:.95rem; }
 .wb-group b { color: var(--wb-accent); }
-.wb-empty { text-align:center; padding:2.6rem 1rem; opacity:.75; }
+.wb-empty { text-align:center; padding:2.6rem 1rem; opacity:.8; }
 .wb-empty .t { font-weight:600; font-size:1rem; margin-bottom:.25rem; }
-.wb-quote { font-size:1.02rem; line-height:1.55; padding:.2rem 0 .1rem .8rem;
-  border-left:3px solid var(--wb-line); margin:.3rem 0 .8rem 0; }
-.wb-badge { display:inline-block; font-size:.8rem; font-weight:600; padding:.18rem .6rem; border-radius:999px;
+.wb-quote { font-size:1.02rem; line-height:1.55; padding:.2rem 0 .1rem .85rem;
+  border-left:3px solid var(--wb-accent); margin:.35rem 0 .8rem 0; }
+.wb-badge { display:inline-block; font-size:.8rem; font-weight:600; padding:.2rem .65rem; border-radius:999px;
   border:1px solid var(--wb-line); background:var(--wb-soft); margin-right:.3rem; }
-.wb-badge.pos { color:#16A34A; background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.35); }
-.wb-badge.neg { color:#DC2626; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.35); }
-.wb-badge.neu { background:rgba(148,163,184,.15); border-color:rgba(148,163,184,.4); }
-.wb-badge.warn { color:#B45309; background:rgba(245,158,11,.13); border-color:rgba(245,158,11,.4); }
+.wb-badge.pos { color:#16A34A; background:rgba(34,197,94,.13); border-color:rgba(34,197,94,.35); }
+.wb-badge.neg { color:#DC2626; background:rgba(239,68,68,.13); border-color:rgba(239,68,68,.35); }
+.wb-badge.neu { background:rgba(148,163,184,.16); border-color:rgba(148,163,184,.4); }
+.wb-badge.warn { color:#B45309; background:rgba(245,158,11,.14); border-color:rgba(245,158,11,.4); }
 .wb-summary { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.88rem; line-height:1.7; }
-.stTabs [data-baseweb="tab-list"] { gap:.2rem; border-bottom:1px solid var(--wb-line); overflow-x:auto; }
-.stTabs [data-baseweb="tab"] { height:auto; padding:.65rem .95rem; }
-.stTabs [data-baseweb="tab"] p { font-size:.92rem; font-weight:600; }
-.stTabs [aria-selected="true"] p { color: var(--wb-accent); }
-.stTabs [data-baseweb="tab-highlight"] { background-color: var(--wb-accent); }
-.stTabs [data-baseweb="tab-panel"] { padding-top: 1.5rem; }
-[data-testid="stVerticalBlockBorderWrapper"] { border-radius:14px; }
-[data-testid="stMetric"] { padding:.15rem 0; }
+
+/* ---------- glass cards (only containers created with card()) ---------- */
+.element-container:has(.wb-glass), [data-testid="stElementContainer"]:has(.wb-glass) { display:none; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.wb-glass):not(:has([data-testid="stVerticalBlockBorderWrapper"] .wb-glass)) {
+  background: var(--wb-glass); border:1px solid var(--wb-line) !important; border-radius:18px;
+  backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--wb-shadow), inset 0 1px 0 rgba(255,255,255,.10);
+  transition: transform .3s var(--wb-ease), box-shadow .3s var(--wb-ease), border-color .3s;
+  animation: wbFade .55s var(--wb-ease) both; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.wb-glass):not(:has([data-testid="stVerticalBlockBorderWrapper"] .wb-glass)):hover {
+  transform: translateY(-2px); box-shadow: 0 16px 40px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.12);
+  border-color: rgba(234,88,12,.35) !important; }
+
+/* ---------- tabs as a glass pill bar ---------- */
+.stTabs [data-baseweb="tab-list"] { gap:.25rem; padding:.35rem; border-radius:999px; overflow-x:auto;
+  background: var(--wb-glass); border:1px solid var(--wb-line);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.stTabs [data-baseweb="tab"] { height:auto; padding:.55rem 1rem; border-radius:999px; white-space:nowrap;
+  transition: background .25s var(--wb-ease), transform .2s var(--wb-ease); }
+.stTabs [data-baseweb="tab"]:hover { background: rgba(234,88,12,.10); }
+.stTabs [data-baseweb="tab"] p { font-size:.88rem; font-weight:600; }
+.stTabs [aria-selected="true"] { background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent));
+  box-shadow: 0 6px 16px rgba(234,88,12,.30); }
+.stTabs [aria-selected="true"] p { color:#fff !important; }
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none; }
+.stTabs [data-baseweb="tab-panel"] { padding-top:1.6rem; animation: wbFade .45s var(--wb-ease) both; }
+
+/* ---------- buttons ---------- */
+.stButton > button, .stDownloadButton > button {
+  border-radius:12px; font-weight:600; padding:.6rem 1.1rem; border:1px solid var(--wb-line);
+  background: var(--wb-glass); backdrop-filter: blur(10px); color: inherit;
+  transition: transform .18s var(--wb-ease), box-shadow .25s var(--wb-ease), filter .2s; }
+.stButton > button:hover, .stDownloadButton > button:hover { transform: translateY(-1px);
+  border-color: rgba(234,88,12,.45); box-shadow: 0 8px 20px rgba(15,23,42,.12); }
+.stButton > button:active, .stDownloadButton > button:active { transform: translateY(1px) scale(.99); }
+.stButton > button[kind="primary"], [data-testid="stBaseButton-primary"] {
+  background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent)) !important;
+  border: none !important; color:#fff !important;
+  box-shadow: 0 8px 22px rgba(234,88,12,.35), inset 0 1px 0 rgba(255,255,255,.25); }
+.stButton > button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover {
+  filter: brightness(1.06); box-shadow: 0 12px 28px rgba(234,88,12,.45), inset 0 1px 0 rgba(255,255,255,.25); }
+
+/* ---------- inputs, metrics, expanders ---------- */
+[data-baseweb="input"], [data-baseweb="select"] > div, [data-baseweb="textarea"] {
+  border-radius:12px !important; transition: box-shadow .2s, border-color .2s; }
+[data-baseweb="input"]:focus-within, [data-baseweb="select"] > div:focus-within,
+[data-baseweb="textarea"]:focus-within { box-shadow: 0 0 0 3px rgba(234,88,12,.22) !important;
+  border-color: var(--wb-accent) !important; }
+[data-testid="stMetric"] { background: var(--wb-glass); border:1px solid var(--wb-line); border-radius:16px;
+  padding:.8rem 1rem; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  animation: wbFade .5s var(--wb-ease) both; transition: transform .25s var(--wb-ease); }
+[data-testid="stMetric"]:hover { transform: translateY(-2px); }
 [data-testid="stMetricLabel"] p { font-size:.78rem; opacity:.7; }
-[data-testid="stMetricValue"] { font-size:1.6rem; font-variant-numeric: tabular-nums; }
-.stButton > button, .stDownloadButton > button { border-radius:10px; font-weight:600; }
-.stButton > button[kind="primary"] { background: var(--wb-accent); border-color: var(--wb-accent); }
-[data-testid="stExpander"] details { border-radius:12px; }
+[data-testid="stMetricValue"] { font-size:1.6rem; font-weight:700; font-variant-numeric: tabular-nums; }
+[data-testid="stExpander"] details { border-radius:14px; background: var(--wb-glass);
+  border:1px solid var(--wb-line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+[data-testid="stExpander"] summary:hover { color: var(--wb-accent); }
+[data-testid="stProgress"] > div > div > div > div { background: linear-gradient(90deg, var(--wb-accent2), var(--wb-accent)); }
+[data-testid="stAlert"] { border-radius:14px; backdrop-filter: blur(10px); }
+
+/* ---------- motion ---------- */
+@keyframes wbFade { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+@keyframes wbPop { from { opacity:0; transform: scale(.94); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 """
 )
+
+
+DARK_CSS = """
+<style>
+:root { --wb-glass: rgba(255,255,255,.055); --wb-line: rgba(255,255,255,.13);
+  --wb-soft: rgba(255,255,255,.06); --wb-shadow: 0 12px 34px rgba(0,0,0,.45); }
+.stApp { background:#0B0F19 !important; color:#E5E7EB !important; }
+.stApp::before { opacity:1.25; }
+.stApp p, .stApp li, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+[data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"] p,
+.wb-name, .wb-title, .wb-tag, .wb-lead, .wb-note, .wb-label, .wb-quote, .wb-group, .wb-summary,
+.wb-empty, .wb-tagpill, [data-testid="stMetricValue"], [data-testid="stMetricLabel"] p,
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary p { color:#E5E7EB !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color:#9CA3AF !important; }
+.stTabs [data-baseweb="tab"] p { color:#CBD5E1 !important; }
+.stTabs [aria-selected="true"] p { color:#fff !important; }
+[data-baseweb="input"], [data-baseweb="base-input"], [data-baseweb="select"] > div,
+[data-baseweb="textarea"], [data-baseweb="textarea"] textarea, [data-baseweb="input"] input {
+  background:#161B26 !important; color:#F3F4F6 !important; border-color: rgba(255,255,255,.12) !important; }
+[data-baseweb="select"] span, [data-baseweb="select"] div { color:#F3F4F6 !important; }
+[data-baseweb="select"] svg, [data-baseweb="input"] svg { fill:#CBD5E1 !important; }
+[data-testid="stNumberInputStepDown"], [data-testid="stNumberInputStepUp"] {
+  background:#1E2533 !important; color:#E5E7EB !important; }
+[data-baseweb="popover"] ul, [data-baseweb="popover"] li, [data-baseweb="menu"] {
+  background:#161B26 !important; color:#F3F4F6 !important; }
+[data-baseweb="popover"] li:hover { background:#1E2533 !important; }
+[data-testid="stFileUploaderDropzone"] { background:#161B26 !important; color:#E5E7EB !important;
+  border-color: rgba(255,255,255,.15) !important; }
+[data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#9CA3AF !important; }
+.stButton > button, .stDownloadButton > button { color:#E5E7EB !important; }
+.stButton > button[kind="primary"], [data-testid="stBaseButton-primary"] { color:#fff !important; }
+[data-testid="stDataFrame"], [data-testid="stTable"] { filter: invert(.92) hue-rotate(180deg); }
+[data-testid="stJson"] { background:#161B26 !important; border-radius:12px; }
+[data-testid="stAlert"] { background: rgba(255,255,255,.06) !important; }
+[data-testid="stAlert"] p { color:#E5E7EB !important; }
+header[data-testid="stHeader"] * { color:#CBD5E1 !important; }
+hr { border-color: rgba(255,255,255,.12) !important; }
+</style>
+"""
+
+
+def dark_on() -> bool:
+    return bool(st.session_state.get("dark_mode", False))
 
 
 def esc(value) -> str:
@@ -158,8 +286,26 @@ def title(text: str, lead: str = "") -> None:
     html(f'<div class="wb-title">{esc(text)}</div>{lead_html}')
 
 
+@contextmanager
+def card():
+    """A bordered container that gets the frosted-glass style."""
+    with st.container(border=True):
+        html('<span class="wb-glass"></span>')
+        yield
+
+
 def show_chart(chart) -> None:
-    st.altair_chart(chart.configure_view(strokeWidth=0), use_container_width=True)
+    chart = chart.configure_view(strokeWidth=0)
+    if dark_on():
+        ink, grid = "#CBD5E1", "rgba(255,255,255,0.08)"
+        chart = (chart.configure(background="transparent")
+                 .configure_axis(labelColor=ink, titleColor=ink, gridColor=grid,
+                                 domainColor="rgba(255,255,255,0.2)",
+                                 tickColor="rgba(255,255,255,0.2)")
+                 .configure_legend(labelColor=ink, titleColor=ink))
+        st.altair_chart(chart, use_container_width=True, theme=None)
+    else:
+        st.altair_chart(chart, use_container_width=True)
 
 
 # --------------------------------------------------------------------------
@@ -545,12 +691,18 @@ def group_name(group: int) -> str:
 # Header
 # --------------------------------------------------------------------------
 estimate_now = st.session_state.get("estimate")
-html(
-    '<div class="wb-hero"><div class="wb-logo">W</div><div>'
-    f'<div class="wb-name">{APP_NAME}</div>'
-    '<div class="wb-tag">Delivery estimates and service review for a small courier office</div>'
-    "</div></div>"
-)
+brand_col, toggle_col = st.columns([5, 1], vertical_alignment="center")
+with brand_col:
+    html(
+        '<div class="wb-hero"><div class="wb-logo">W</div><div>'
+        f'<div class="wb-name">{APP_NAME}</div>'
+        '<div class="wb-tag">Delivery estimates and service review for a small courier office</div>'
+        "</div></div>"
+    )
+with toggle_col:
+    st.toggle("Dark mode", key="dark_mode", help="Switch between light and dark colours.")
+if dark_on():
+    html(DARK_CSS)
 status = ["Works offline", "Demonstration data", f"Models loaded at {LOADED_AT}"]
 if estimate_now:
     status.insert(0, f"Current job: **{estimate_now['minutes']:.1f} min**")
@@ -573,7 +725,7 @@ with tab_overview:
 
     form_col, result_col = st.columns([1, 1], gap="large")
     with form_col:
-        with st.container(border=True):
+        with card():
             st.selectbox("Start from an example", EXAMPLES["record_id"].tolist(),
                          key="example_id", on_change=load_example_into_form,
                          format_func=example_label)
@@ -607,7 +759,7 @@ with tab_overview:
     with result_col:
         errors = st.session_state.get("form_errors", [])
         estimate = st.session_state.get("estimate")
-        with st.container(border=True):
+        with card():
             if errors:
                 st.error("**Please check these values:**\n\n"
                          + "\n".join(f"- {e}" for e in errors))
@@ -723,7 +875,7 @@ with tab_profiles:
     cols = st.columns(len(profile_table), gap="medium")
     for col, (g, r) in zip(cols, profile_table.iterrows()):
         with col:
-            with st.container(border=True):
+            with card():
                 marker = "  ← this job" if current == g else ""
                 st.markdown(f"**{group_name(g)}**{marker}")
                 st.caption(f"Group {g} · {int(r['jobs'])} jobs")
@@ -780,7 +932,7 @@ with tab_image:
     left, right = st.columns([1, 1], gap="large")
     image, problem, suggestion, scores = None, None, None, None
     with left:
-        with st.container(border=True):
+        with card():
             source = st.radio("Image", ["Sample image", "Upload my own"], horizontal=True,
                               key="img_source", label_visibility="collapsed")
             if source == "Sample image":
@@ -816,7 +968,7 @@ with tab_image:
                 st.caption("Upload a PNG or JPG image, or switch to a sample.")
 
     with right:
-        with st.container(border=True):
+        with card():
             image_model_name = st.selectbox("Model", list(IMAGE_MODELS), index=0,
                                             key="img_model")
             if image is not None:
@@ -891,7 +1043,7 @@ with tab_comments:
         st.write("")
         pick_col, write_col = st.columns(2, gap="large")
         with pick_col:
-            with st.container(border=True):
+            with card():
                 st.markdown("**Browse a customer comment**")
                 options = table["comment_id"].tolist()
                 picked = st.selectbox(
@@ -904,7 +1056,7 @@ with tab_comments:
                 st.caption(f"Reference label: {row['sentiment_label']}")
 
         with write_col:
-            with st.container(border=True):
+            with card():
                 st.markdown("**Try your own comment**")
                 typed = st.text_area("Comment", key="comment_text", max_chars=MAX_COMMENT_CHARS,
                                      height=90, label_visibility="collapsed",
@@ -1012,7 +1164,7 @@ with tab_summary:
                     horizontal=True, key="summary_mode", label_visibility="collapsed")
 
     def show_offline() -> None:
-        with st.container(border=True):
+        with card():
             body = esc(offline_text).replace("  ", "&nbsp;&nbsp;")
             html(f'<div class="wb-summary">{body}</div>')
         st.download_button("Download as text", offline_text,
@@ -1068,7 +1220,7 @@ with tab_summary:
             if ai["key"] != snap_key:
                 st.info("The results changed after this summary was made. Generate again to "
                         "update it.")
-            with st.container(border=True):
+            with card():
                 st.caption(f"AI-generated · Groq · {ai['time']} · {len(ai['text'].split())} words")
                 st.markdown(ai["text"])
             st.caption("AI text can contain mistakes — check numbers against the offline "
