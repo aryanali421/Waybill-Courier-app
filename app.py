@@ -639,7 +639,7 @@ hr { border-color: rgba(255,255,255,.12) !important; }
 
 
 def dark_on() -> bool:
-    return bool(st.session_state.get("dark_mode", False))
+    return bool(st.session_state.get("dark_mode", True))
 
 
 def esc(value) -> str:
@@ -728,8 +728,9 @@ with brand_col:
         '<div class="wb-tag">Delivery estimates and service review for a small courier office</div>'
         "</div></div>"
     )
+st.session_state.setdefault("dark_mode", True)  # the app opens in dark mode
 with toggle_col:
-    st.toggle("Dark mode", key="dark_mode", help="Switch between light and dark colours.")
+    st.toggle("Dark mode", key="dark_mode", help="Switch between dark and light colours.")
 if dark_on():
     html(DARK_CSS)
 status = ["Works offline", "Demonstration data", f"Models loaded at {LOADED_AT}"]
