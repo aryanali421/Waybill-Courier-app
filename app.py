@@ -581,7 +581,7 @@ footer { visibility:hidden; }
 .stApp button, .stApp a, .stApp [role='tab'], .stApp [role='switch'], .stApp [role='radio'], .stApp summary,
 .stApp [data-baseweb='select'], .stApp [data-baseweb='select'] *, .stApp label:has(input[type='checkbox']), .stApp label:has(input[type='radio']) {
   cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><circle cx='13' cy='13' r='7.5' fill='%23EA580C' fill-opacity='.9' stroke='white' stroke-width='1.5'/></svg>") 13 13, pointer; }
-.stApp input, .stApp textarea { cursor: text; }
+.stApp input, .stApp textarea { cursor: text; caret-color: #F97316; }
 #wb-cursor { position:fixed; left:0; top:0; width:36px; height:36px; margin:-18px 0 0 -18px; border-radius:50%;
   border:1.5px solid rgba(234,88,12,.55); background: rgba(234,88,12,.06); pointer-events:none; z-index:2147483646;
   opacity:0; will-change: transform; transition: width .35s var(--wb-ease), height .35s var(--wb-ease),
