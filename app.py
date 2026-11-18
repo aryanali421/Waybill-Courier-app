@@ -436,7 +436,9 @@ html, body, [class*="css"], .stMarkdown, button, input, textarea, select, label 
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
 :root { --wb-accent:#EA580C; --wb-accent2:#F97316; --wb-line: rgba(128,128,128,.22);
   --wb-soft: rgba(128,128,128,.07); --wb-glass: rgba(128,128,128,.075);
-  --wb-shadow: 0 10px 30px rgba(15,23,42,.10); --wb-ease: cubic-bezier(.22,.8,.3,1); }
+  --wb-shadow: 0 10px 30px rgba(15,23,42,.10); --wb-ease: cubic-bezier(.16,1,.3,1);
+  --wb-soft-ease: cubic-bezier(.45,0,.2,1); }
+html { scroll-behavior: smooth; }
 
 /* ---------- layout ---------- */
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1080px; }
@@ -454,7 +456,8 @@ footer { visibility:hidden; }
     radial-gradient(34% 32% at 82% 18%, rgba(14,165,233,.18), transparent 70%),
     radial-gradient(40% 38% at 70% 85%, rgba(168,85,247,.14), transparent 72%),
     radial-gradient(30% 30% at 10% 90%, rgba(34,197,94,.10), transparent 70%);
-  filter: blur(40px); animation: wbDrift 26s ease-in-out infinite alternate; }
+  filter: blur(40px); will-change: transform;
+  animation: wbDrift 42s var(--wb-soft-ease) infinite alternate; }
 @keyframes wbDrift {
   0%   { transform: translate3d(0,0,0) scale(1); }
   50%  { transform: translate3d(3%,-2%,0) scale(1.06); }
@@ -462,25 +465,25 @@ footer { visibility:hidden; }
 
 /* ---------- header ---------- */
 .wb-hero { display:flex; align-items:center; gap:.85rem; margin-bottom:.2rem;
-  animation: wbFade .6s var(--wb-ease) both; }
+  animation: wbFade .9s var(--wb-ease) both; }
 .wb-logo { width:44px; height:44px; border-radius:13px; color:#fff; font-weight:800; font-size:1.2rem;
   display:flex; align-items:center; justify-content:center;
   background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent));
   box-shadow: 0 8px 22px rgba(234,88,12,.35), inset 0 1px 0 rgba(255,255,255,.35);
-  animation: wbFloat 6s ease-in-out infinite; }
-@keyframes wbFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  animation: wbFloat 7s var(--wb-soft-ease) infinite; }
+@keyframes wbFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 .wb-name { font-size:1.55rem; font-weight:800; letter-spacing:-.025em; line-height:1.1; }
 .wb-tag { font-size:.9rem; opacity:.65; }
 
 /* ---------- text ---------- */
 .wb-title { font-size:1.25rem; font-weight:700; letter-spacing:-.015em; margin:.1rem 0 .1rem 0;
-  animation: wbFade .5s var(--wb-ease) both; }
-.wb-lead { font-size:.92rem; opacity:.65; margin-bottom:1.1rem; animation: wbFade .55s var(--wb-ease) both; }
+  animation: wbFade .8s var(--wb-ease) both; }
+.wb-lead { font-size:.92rem; opacity:.65; margin-bottom:1.1rem; animation: wbFade .8s var(--wb-ease) .06s both; }
 .wb-label { font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
 .wb-big { font-size:3.1rem; font-weight:800; letter-spacing:-.035em; line-height:1.05; margin:.3rem 0 .2rem 0;
   font-variant-numeric: tabular-nums; background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent));
   -webkit-background-clip:text; background-clip:text; color:transparent;
-  animation: wbPop .6s var(--wb-ease) both; }
+  animation: wbPop .9s var(--wb-ease) both; }
 .wb-big span { font-size:1rem; font-weight:600; margin-left:.35rem; letter-spacing:0;
   color: rgb(128,128,128); -webkit-text-fill-color: rgb(128,128,128); }
 .wb-note { font-size:.86rem; opacity:.65; line-height:1.5; }
@@ -507,10 +510,10 @@ footer { visibility:hidden; }
   background: var(--wb-glass); border:1px solid var(--wb-line) !important; border-radius:18px;
   backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
   box-shadow: var(--wb-shadow), inset 0 1px 0 rgba(255,255,255,.10);
-  transition: transform .3s var(--wb-ease), box-shadow .3s var(--wb-ease), border-color .3s;
-  animation: wbFade .55s var(--wb-ease) both; }
+  transition: transform .55s var(--wb-ease), box-shadow .55s var(--wb-ease), border-color .45s ease;
+  animation: wbFade .8s var(--wb-ease) both; will-change: transform; }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.wb-glass):not(:has([data-testid="stVerticalBlockBorderWrapper"] .wb-glass)):hover {
-  transform: translateY(-2px); box-shadow: 0 16px 40px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.12);
+  transform: translateY(-3px); box-shadow: 0 18px 44px rgba(15,23,42,.14), inset 0 1px 0 rgba(255,255,255,.12);
   border-color: rgba(234,88,12,.35) !important; }
 
 /* ---------- tabs as a glass pill bar ---------- */
@@ -518,23 +521,24 @@ footer { visibility:hidden; }
   background: var(--wb-glass); border:1px solid var(--wb-line);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 .stTabs [data-baseweb="tab"] { height:auto; padding:.55rem 1rem; border-radius:999px; white-space:nowrap;
-  transition: background .25s var(--wb-ease), transform .2s var(--wb-ease); }
+  transition: background .45s var(--wb-ease), box-shadow .45s var(--wb-ease), transform .35s var(--wb-ease); }
 .stTabs [data-baseweb="tab"]:hover { background: rgba(234,88,12,.10); }
 .stTabs [data-baseweb="tab"] p { font-size:.88rem; font-weight:600; }
 .stTabs [aria-selected="true"] { background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent));
   box-shadow: 0 6px 16px rgba(234,88,12,.30); }
 .stTabs [aria-selected="true"] p { color:#fff !important; }
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none; }
-.stTabs [data-baseweb="tab-panel"] { padding-top:1.6rem; animation: wbFade .45s var(--wb-ease) both; }
+.stTabs [data-baseweb="tab-panel"] { padding-top:1.6rem; animation: wbFade .7s var(--wb-ease) both; }
 
 /* ---------- buttons ---------- */
 .stButton > button, .stDownloadButton > button {
   border-radius:12px; font-weight:600; padding:.6rem 1.1rem; border:1px solid var(--wb-line);
   background: var(--wb-glass); backdrop-filter: blur(10px); color: inherit;
-  transition: transform .18s var(--wb-ease), box-shadow .25s var(--wb-ease), filter .2s; }
-.stButton > button:hover, .stDownloadButton > button:hover { transform: translateY(-1px);
+  transition: transform .4s var(--wb-ease), box-shadow .45s var(--wb-ease), filter .3s ease,
+    border-color .35s ease; }
+.stButton > button:hover, .stDownloadButton > button:hover { transform: translateY(-2px);
   border-color: rgba(234,88,12,.45); box-shadow: 0 8px 20px rgba(15,23,42,.12); }
-.stButton > button:active, .stDownloadButton > button:active { transform: translateY(1px) scale(.99); }
+.stButton > button:active, .stDownloadButton > button:active { transform: translateY(0) scale(.98); transition-duration: .12s; }
 .stButton > button[kind="primary"], [data-testid="stBaseButton-primary"] {
   background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent)) !important;
   border: none !important; color:#fff !important;
@@ -544,13 +548,13 @@ footer { visibility:hidden; }
 
 /* ---------- inputs, metrics, expanders ---------- */
 [data-baseweb="input"], [data-baseweb="select"] > div, [data-baseweb="textarea"] {
-  border-radius:12px !important; transition: box-shadow .2s, border-color .2s; }
+  border-radius:12px !important; transition: box-shadow .35s var(--wb-ease), border-color .35s ease; }
 [data-baseweb="input"]:focus-within, [data-baseweb="select"] > div:focus-within,
 [data-baseweb="textarea"]:focus-within { box-shadow: 0 0 0 3px rgba(234,88,12,.22) !important;
   border-color: var(--wb-accent) !important; }
 [data-testid="stMetric"] { background: var(--wb-glass); border:1px solid var(--wb-line); border-radius:16px;
   padding:.8rem 1rem; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  animation: wbFade .5s var(--wb-ease) both; transition: transform .25s var(--wb-ease); }
+  animation: wbFade .8s var(--wb-ease) both; transition: transform .5s var(--wb-ease); }
 [data-testid="stMetric"]:hover { transform: translateY(-2px); }
 [data-testid="stMetricLabel"] p { font-size:.78rem; opacity:.7; }
 [data-testid="stMetricValue"] { font-size:1.6rem; font-weight:700; font-variant-numeric: tabular-nums; }
@@ -561,10 +565,35 @@ footer { visibility:hidden; }
 [data-testid="stAlert"] { border-radius:14px; backdrop-filter: blur(10px); }
 
 /* ---------- motion ---------- */
-@keyframes wbFade { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
-@keyframes wbPop { from { opacity:0; transform: scale(.94); } to { opacity:1; transform:none; } }
+@keyframes wbFade { from { opacity:0; transform: translate3d(0,14px,0) scale(.985); }
+  to { opacity:1; transform: none; } }
+@keyframes wbPop { 0% { opacity:0; transform: scale(.92); } 60% { opacity:1; transform: scale(1.015); }
+  100% { opacity:1; transform: none; } }
+/* stagger: second and third columns arrive a moment later */
+[data-testid="column"]:nth-child(2) > div, [data-testid="stColumn"]:nth-child(2) > div,
+[data-testid="column"]:nth-child(2) [data-testid="stMetric"], [data-testid="stColumn"]:nth-child(2) [data-testid="stMetric"] { animation-delay: .08s; }
+[data-testid="column"]:nth-child(3) [data-testid="stMetric"], [data-testid="stColumn"]:nth-child(3) [data-testid="stMetric"] { animation-delay: .16s; }
+[data-testid="column"]:nth-child(4) [data-testid="stMetric"], [data-testid="stColumn"]:nth-child(4) [data-testid="stMetric"] { animation-delay: .24s; }
+[data-testid="column"]:nth-child(2) [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stColumn"]:nth-child(2) [data-testid="stVerticalBlockBorderWrapper"] { animation-delay: .1s; }
+[data-testid="column"]:nth-child(3) [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stColumn"]:nth-child(3) [data-testid="stVerticalBlockBorderWrapper"] { animation-delay: .2s; }
+/* ---------- cursor ---------- */
+.stApp, .stApp * { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'><circle cx='10' cy='10' r='5' fill='%23EA580C' stroke='white' stroke-width='1.5'/></svg>") 10 10, auto; }
+.stApp button, .stApp a, .stApp [role='tab'], .stApp [role='switch'], .stApp [role='radio'], .stApp summary,
+.stApp [data-baseweb='select'], .stApp [data-baseweb='select'] *, .stApp label:has(input[type='checkbox']), .stApp label:has(input[type='radio']) {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><circle cx='13' cy='13' r='7.5' fill='%23EA580C' fill-opacity='.9' stroke='white' stroke-width='1.5'/></svg>") 13 13, pointer; }
+.stApp input, .stApp textarea { cursor: text; }
+#wb-cursor { position:fixed; left:0; top:0; width:36px; height:36px; margin:-18px 0 0 -18px; border-radius:50%;
+  border:1.5px solid rgba(234,88,12,.55); background: rgba(234,88,12,.06); pointer-events:none; z-index:2147483646;
+  opacity:0; will-change: transform; transition: width .35s var(--wb-ease), height .35s var(--wb-ease),
+  margin .35s var(--wb-ease), background .35s ease, border-color .35s ease, opacity .4s ease; }
+#wb-cursor.on { opacity:1; }
+#wb-cursor.hover { width:54px; height:54px; margin:-27px 0 0 -27px; background: rgba(255,255,255,.10);
+  border-color: #EA580C; box-shadow: 0 0 0 1.5px rgba(255,255,255,.75), 0 6px 18px rgba(234,88,12,.25); }
+#wb-cursor.down { width:28px; height:28px; margin:-14px 0 0 -14px; background: rgba(234,88,12,.22); }
+@media (pointer: coarse) { #wb-cursor { display:none; } .stApp, .stApp * { cursor: auto; } }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; } }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; } #wb-cursor { display:none; } }
 </style>
 """
 )
@@ -1246,3 +1275,58 @@ st.caption(f"{APP_NAME} · AI for Everyone · Project 05 · Demonstration on gen
            "data, CIFAR-10 images and authored comments. Estimates are not delivery guarantees. "
            "No GPS, maps, route optimisation, driver ranking or customer messaging. Models are "
            "loaded from files and never retrained in the app.")
+
+
+# --------------------------------------------------------------------------
+# Smooth cursor ring (decoration only; the orange dot cursor works without it)
+# --------------------------------------------------------------------------
+CURSOR_JS = """
+<script>
+(function () {
+  try {
+    var win = window.parent, doc = win.document;
+    if (win.matchMedia("(pointer: coarse)").matches ||
+        win.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+    if (win.__wbCursor) { try { win.__wbCursor.stop(); } catch (e) {} }
+    var old = doc.getElementById("wb-cursor"); if (old) { old.remove(); }
+    var ring = doc.createElement("div"); ring.id = "wb-cursor"; doc.body.appendChild(ring);
+    var x = -100, y = -100, rx = -100, ry = -100, running = true;
+    var CLICKABLE = "button, a, [role=tab], [role=switch], [role=radio], summary, " +
+                    "[data-baseweb=select], label:has(input[type=checkbox]), label:has(input[type=radio])";
+    function move(e) {
+      x = e.clientX; y = e.clientY; ring.classList.add("on");
+      var t = e.target && e.target.closest ? e.target.closest(CLICKABLE) : null;
+      ring.classList.toggle("hover", !!t);
+    }
+    function leave() { ring.classList.remove("on"); }
+    function down() { ring.classList.add("down"); }
+    function up() { ring.classList.remove("down"); }
+    doc.addEventListener("mousemove", move, { passive: true });
+    doc.addEventListener("mouseleave", leave);
+    doc.addEventListener("mousedown", down);
+    doc.addEventListener("mouseup", up);
+    function frame() {
+      if (!running) { return; }
+      rx += (x - rx) * 0.2; ry += (y - ry) * 0.2;
+      ring.style.transform = "translate3d(" + rx.toFixed(1) + "px," + ry.toFixed(1) + "px,0)";
+      win.requestAnimationFrame(frame);
+    }
+    win.requestAnimationFrame(frame);
+    win.__wbCursor = { stop: function () {
+      running = false;
+      doc.removeEventListener("mousemove", move);
+      doc.removeEventListener("mouseleave", leave);
+      doc.removeEventListener("mousedown", down);
+      doc.removeEventListener("mouseup", up);
+      ring.remove();
+    } };
+  } catch (e) { /* blocked by the browser: the CSS dot cursor still works */ }
+})();
+</script>
+"""
+try:
+    import streamlit.components.v1 as components
+
+    components.html(CURSOR_JS, height=0)
+except Exception:  # noqa: BLE001 - purely decorative
+    pass
