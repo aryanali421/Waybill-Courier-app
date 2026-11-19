@@ -39,6 +39,7 @@ SAMPLES = BASE / "sample_images"
 NLTK_DIR = BASE / "nltk_data"
 
 APP_NAME = "Waybill"
+APP_VERSION = "1.5 (animated cards)"
 MAX_COMMENT_CHARS = 1000
 MAX_UPLOAD_MB = 5
 MAX_CSV_ROWS = 200
@@ -270,13 +271,13 @@ def friendly_profile(group: int) -> dict:
     weight_z = (r["weight_kg"] - usual["weight_kg"]) / spread["weight_kg"]
     w = f"{r['w_lo']:.0f}–{r['w_hi']:.0f} kg"
     if traffic_z >= 0.35:
-        icon, name, what = "🚦", "Mixed weights, busy roads", f"All sizes (mostly {w}), on busy roads."
+        icon, name, what = "🚦", "Mixed parcels", f"Mostly {w}, on busy roads."
     elif weight_z >= 0.35:
         icon, name, what = "📦", "Heavy parcels", f"Mostly {w}, on quiet roads."
     elif weight_z <= -0.35:
         icon, name, what = "✉️", "Light parcels", f"Mostly {w}, on quiet roads."
     else:
-        icon, name, what = "🧭", "Medium parcels", f"Mostly {w}, normal roads."
+        icon, name, what = "🧭", "Medium parcels", f"Mostly {w}, on normal roads."
     if table["minutes"].idxmin() == group:
         timing = "fastest"
     elif table["minutes"].idxmax() == group:
@@ -865,7 +866,8 @@ with toggle_col:
     st.toggle("Dark mode", key="dark_mode", help="Switch between dark and light colours.")
 if dark_on():
     html(DARK_CSS)
-status = ["Works offline", "Demonstration data", f"Models loaded at {LOADED_AT}"]
+status = ["Works offline", "Demonstration data", f"Models loaded at {LOADED_AT}",
+          f"Version {APP_VERSION}"]
 if estimate_now:
     status.insert(0, f"Current job: **{estimate_now['minutes']:.1f} min**")
 st.caption("  ·  ".join(status))
