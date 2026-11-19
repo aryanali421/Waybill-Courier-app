@@ -269,31 +269,8 @@ def friendly_profile(group: int) -> dict:
     traffic_z = (r["traffic_index"] - usual["traffic_index"]) / spread["traffic_index"]
     weight_z = (r["weight_kg"] - usual["weight_kg"]) / spread["weight_kg"]
     w = f"{r['w_lo']:.0f}–{r['w_hi']:.0f} kg"
-    if traffic_z >= 0.35:    for col, (g, r) in zip(cols, profile_table.iterrows()):
-        with col:
-            with card():
-                p = friendly_profile(g)
-                you = '<span class="wb-you">Your job</span><br>' if current == g else ""
-                info = [
-                    ("Weight", f"{r['weight_kg']:.1f} kg on average"),
-                    ("Traffic", f"{traffic_word(r['traffic_index'])} ({r['traffic_index']:.1f} of 5)"),
-                    ("Distance", f"about {r['distance_km']:.0f} km"),
-                    ("Stops", f"about {r['stops_count']:.0f}"),
-                ]
-                rows_html = "".join(f'<span class="k">{k}</span><span class="v">{esc(v)}</span>'
-                                    for k, v in info)
-                html(
-                    f'{you}'
-                    # heading: always one line
-                    f'<div class="wb-pname" style="white-space:nowrap;overflow:hidden;'
-                    f'text-overflow:ellipsis">{p["icon"]} {esc(p["name"])}</div>'
-                    # description: always takes two lines of space, so every card lines up
-                    f'<div class="wb-note" style="margin-top:.15rem;line-height:1.5;'
-                    f'height:3em;overflow:hidden">{esc(p["what"])}</div>'
-                    f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
-                    f'<span class="wb-note">usually · {p["timing"]}</span></div>'
-                    f'<div class="wb-info" style="padding-bottom:.55rem">{rows_html}</div>'
-                ) icon, name, what = "🚦", "Mixed weights, busy roads", f"All sizes (mostly {w}), on busy roads."
+    if traffic_z >= 0.35:
+        icon, name, what = "🚦", "Mixed weights, busy roads", f"All sizes (mostly {w}), on busy roads."
     elif weight_z >= 0.35:
         icon, name, what = "📦", "Heavy parcels", f"Mostly {w}, on quiet roads."
     elif weight_z <= -0.35:
@@ -578,10 +555,12 @@ footer { visibility:hidden; }
   padding:.7rem 0 .55rem 0; border-top:1px solid var(--wb-line); margin-top:.5rem; }
 .wb-info .k { opacity:.6; }
 .wb-info .v { font-weight:600; text-align:right; font-variant-numeric: tabular-nums; }
-/* fixed heights so all three job-type cards line up and are the same size */
-.wb-pname { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wb-pdesc { margin-top:.15rem; line-height:1.5; min-height:3em; }
-.wb-pname { font-size:1.02rem; font-weight:700; line-height:1.3; margin-top:.15rem; }
+/* job-type cards: every part has a fixed height, so all three cards are the same size */
+.wb-pcard { display:flex; flex-direction:column; }
+.wb-pbadge { height:1.55rem; }                       /* space kept even when there is no badge */
+.wb-pname { font-size:1.02rem; font-weight:700; line-height:1.3; height:1.35rem;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wb-pdesc { margin-top:.15rem; line-height:1.5; height:3em; overflow:hidden; }
 .wb-ptime { display:flex; align-items:baseline; gap:.45rem; margin:.8rem 0 .2rem 0; }
 .wb-ptime .n { font-size:1.9rem; font-weight:800; letter-spacing:-.02em; color: var(--wb-accent);
   font-variant-numeric: tabular-nums; }
@@ -595,7 +574,7 @@ footer { visibility:hidden; }
 .wb-diff.down { color:#16A34A; background:rgba(34,197,94,.13); }
 .wb-diff.same { opacity:.6; background:var(--wb-soft); }
 .wb-you { display:inline-block; font-size:.72rem; font-weight:700; color:#fff; padding:.15rem .55rem;
-  border-radius:999px; background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent)); margin-bottom:.35rem; }
+  border-radius:999px; background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent)); }
 .wb-summary { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.88rem; line-height:1.7; }
 
 /* ---------- glass cards (only containers created with card()) ---------- */
@@ -1047,7 +1026,7 @@ with tab_profiles:
         with col:
             with card():
                 p = friendly_profile(g)
-                you = '<span class="wb-you">Your job</span><br>' if current == g else ""
+                you = '<span class="wb-you">Your job</span>' if current == g else ""
                 info = [
                     ("Weight", f"{r['weight_kg']:.1f} kg on average"),
                     ("Traffic", f"{traffic_word(r['traffic_index'])} ({r['traffic_index']:.1f} of 5)"),
@@ -1057,11 +1036,14 @@ with tab_profiles:
                 rows_html = "".join(f'<span class="k">{k}</span><span class="v">{esc(v)}</span>'
                                     for k, v in info)
                 html(
-                    f'{you}<div class="wb-pname">{p["icon"]} {esc(p["name"])}</div>'
+                    '<div class="wb-pcard">'
+                    f'<div class="wb-pbadge">{you}</div>'
+                    f'<div class="wb-pname">{p["icon"]} {esc(p["name"])}</div>'
                     f'<div class="wb-note wb-pdesc">{esc(p["what"])}</div>'
                     f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
                     f'<span class="wb-note">usually · {p["timing"]}</span></div>'
                     f'<div class="wb-info">{rows_html}</div>'
+                    '</div>'
                 )
     st.caption(f"Times are averages from {len(TRAIN)} past jobs "
                f"(a usual job takes about {usual[TARGET]:.0f} min).")
