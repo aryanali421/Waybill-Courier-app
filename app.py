@@ -269,8 +269,31 @@ def friendly_profile(group: int) -> dict:
     traffic_z = (r["traffic_index"] - usual["traffic_index"]) / spread["traffic_index"]
     weight_z = (r["weight_kg"] - usual["weight_kg"]) / spread["weight_kg"]
     w = f"{r['w_lo']:.0f}–{r['w_hi']:.0f} kg"
-    if traffic_z >= 0.35:
-        icon, name, what = "🚦", "Mixed weights, busy roads", f"All sizes (mostly {w}), on busy roads."
+    if traffic_z >= 0.35:    for col, (g, r) in zip(cols, profile_table.iterrows()):
+        with col:
+            with card():
+                p = friendly_profile(g)
+                you = '<span class="wb-you">Your job</span><br>' if current == g else ""
+                info = [
+                    ("Weight", f"{r['weight_kg']:.1f} kg on average"),
+                    ("Traffic", f"{traffic_word(r['traffic_index'])} ({r['traffic_index']:.1f} of 5)"),
+                    ("Distance", f"about {r['distance_km']:.0f} km"),
+                    ("Stops", f"about {r['stops_count']:.0f}"),
+                ]
+                rows_html = "".join(f'<span class="k">{k}</span><span class="v">{esc(v)}</span>'
+                                    for k, v in info)
+                html(
+                    f'{you}'
+                    # heading: always one line
+                    f'<div class="wb-pname" style="white-space:nowrap;overflow:hidden;'
+                    f'text-overflow:ellipsis">{p["icon"]} {esc(p["name"])}</div>'
+                    # description: always takes two lines of space, so every card lines up
+                    f'<div class="wb-note" style="margin-top:.15rem;line-height:1.5;'
+                    f'height:3em;overflow:hidden">{esc(p["what"])}</div>'
+                    f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
+                    f'<span class="wb-note">usually · {p["timing"]}</span></div>'
+                    f'<div class="wb-info" style="padding-bottom:.55rem">{rows_html}</div>'
+                ) icon, name, what = "🚦", "Mixed weights, busy roads", f"All sizes (mostly {w}), on busy roads."
     elif weight_z >= 0.35:
         icon, name, what = "📦", "Heavy parcels", f"Mostly {w}, on quiet roads."
     elif weight_z <= -0.35:
