@@ -575,6 +575,31 @@ footer { visibility:hidden; }
 .wb-diff.same { opacity:.6; background:var(--wb-soft); }
 .wb-you { display:inline-block; font-size:.72rem; font-weight:700; color:#fff; padding:.15rem .55rem;
   border-radius:999px; background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent)); }
+/* ---------- job-type card animation ---------- */
+/* cards rise in one after another; inside each card the number pops and the rows slide in */
+[data-testid="column"]:nth-child(2) .wb-pcard, [data-testid="stColumn"]:nth-child(2) .wb-pcard { --wb-d:.12s; }
+[data-testid="column"]:nth-child(3) .wb-pcard, [data-testid="stColumn"]:nth-child(3) .wb-pcard { --wb-d:.24s; }
+.wb-pcard { animation: wbCardIn .8s var(--wb-ease) var(--wb-d, 0s) both; }
+.wb-pcard .wb-ptime .n { display:inline-block;
+  animation: wbPop .9s var(--wb-ease) calc(var(--wb-d, 0s) + .2s) both;
+  transition: transform .45s var(--wb-ease), text-shadow .45s ease; }
+.wb-pcard .wb-info > span { animation: wbRowIn .55s var(--wb-ease) both; }
+.wb-pcard .wb-info > span:nth-child(-n+2) { animation-delay: calc(var(--wb-d, 0s) + .30s); }
+.wb-pcard .wb-info > span:nth-child(n+3):nth-child(-n+4) { animation-delay: calc(var(--wb-d, 0s) + .38s); }
+.wb-pcard .wb-info > span:nth-child(n+5):nth-child(-n+6) { animation-delay: calc(var(--wb-d, 0s) + .46s); }
+.wb-pcard .wb-info > span:nth-child(n+7) { animation-delay: calc(var(--wb-d, 0s) + .54s); }
+.wb-picon { display:inline-block; transition: transform .5s var(--wb-ease); }
+/* on hover: icon bounces, number grows and glows */
+[data-testid="stVerticalBlockBorderWrapper"]:hover .wb-picon { transform: translateY(-3px) rotate(-10deg) scale(1.18); }
+[data-testid="stVerticalBlockBorderWrapper"]:hover .wb-pcard .wb-ptime .n {
+  transform: scale(1.06); text-shadow: 0 0 18px rgba(234,88,12,.45); }
+/* the "Your job" badge gently glows */
+.wb-pcard .wb-you { animation: wbGlow 2.6s ease-in-out infinite; }
+@keyframes wbCardIn { from { opacity:0; transform: translate3d(0,18px,0) scale(.97); }
+  to { opacity:1; transform:none; } }
+@keyframes wbRowIn { from { opacity:0; transform: translate3d(0,6px,0); } to { opacity:1; transform:none; } }
+@keyframes wbGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(234,88,12,.0); }
+  50% { box-shadow: 0 0 0 5px rgba(234,88,12,.22); } }
 .wb-summary { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.88rem; line-height:1.7; }
 
 /* ---------- glass cards (only containers created with card()) ---------- */
@@ -1035,14 +1060,20 @@ with tab_profiles:
                 ]
                 rows_html = "".join(f'<span class="k">{k}</span><span class="v">{esc(v)}</span>'
                                     for k, v in info)
+                # Every part has a fixed height (inline, so no style sheet can change it):
+                # all three cards always come out exactly the same size.
                 html(
-                    '<div class="wb-pcard">'
-                    f'<div class="wb-pbadge">{you}</div>'
-                    f'<div class="wb-pname">{p["icon"]} {esc(p["name"])}</div>'
-                    f'<div class="wb-note wb-pdesc">{esc(p["what"])}</div>'
-                    f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
+                    '<div class="wb-pcard" style="height:300px;overflow:hidden;'
+                    'display:flex;flex-direction:column">'
+                    f'<div style="height:1.6rem;flex:none">{you}</div>'
+                    f'<div class="wb-pname" style="height:1.4rem;flex:none;white-space:nowrap;'
+                    f'overflow:hidden;text-overflow:ellipsis"><span class="wb-picon">{p["icon"]}</span> '
+                    f'{esc(p["name"])}</div>'
+                    f'<div class="wb-note" style="height:2.8rem;flex:none;overflow:hidden;'
+                    f'line-height:1.4rem;margin-top:.15rem">{esc(p["what"])}</div>'
+                    f'<div class="wb-ptime" style="flex:none"><span class="n">{p["minutes"]:.0f} min</span>'
                     f'<span class="wb-note">usually · {p["timing"]}</span></div>'
-                    f'<div class="wb-info">{rows_html}</div>'
+                    f'<div class="wb-info" style="flex:none">{rows_html}</div>'
                     '</div>'
                 )
     st.caption(f"Times are averages from {len(TRAIN)} past jobs "
