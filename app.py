@@ -266,24 +266,19 @@ def friendly_profile(group: int) -> dict:
     traffic_z = (r["traffic_index"] - usual["traffic_index"]) / spread["traffic_index"]
     weight_z = (r["weight_kg"] - usual["weight_kg"]) / spread["weight_kg"]
     if traffic_z >= 0.35:
-        icon, name, what = "🚦", "Traffic jobs", "Busy roads slow these jobs down."
+        icon, name, what = "🚦", "Traffic jobs", "Busy roads slow these down."
     elif weight_z >= 0.35:
-        icon, name, what = "📦", "Heavy loads", "Heavier parcels, usually on quiet roads."
+        icon, name, what = "📦", "Heavy loads", "Big parcels, quiet roads."
     elif weight_z <= -0.35:
-        icon, name, what = "🚀", "Quick drops", "Light parcels on quiet roads."
+        icon, name, what = "🚀", "Quick drops", "Small parcels, quiet roads."
     else:
-        icon, name, what = "🧭", "Everyday jobs", "Close to a typical job in every way."
-    gap = r["minutes"] - usual[TARGET]
-    fastest = table["minutes"].idxmin() == group
-    slowest = table["minutes"].idxmax() == group
-    if abs(gap) < 2:
-        timing = "They take about the usual time."
-    elif gap < 0:
-        timing = (f"The fastest jobs — about {abs(gap):.0f} min quicker than usual."
-                  if fastest else f"About {abs(gap):.0f} min quicker than usual.")
+        icon, name, what = "🧭", "Everyday jobs", "A typical job."
+    if table["minutes"].idxmin() == group:
+        timing = "fastest"
+    elif table["minutes"].idxmax() == group:
+        timing = "slowest"
     else:
-        timing = (f"The slowest jobs — about {gap:.0f} min longer than usual."
-                  if slowest else f"About {gap:.0f} min longer than usual.")
+        timing = "average"
     return {"icon": icon, "name": name, "what": what, "timing": timing,
             "minutes": float(r["minutes"]), "jobs": int(r["jobs"])}
 
@@ -1002,9 +997,7 @@ with tab_overview:
 # ==========================================================================
 with tab_profiles:
     title("What type of job is this?",
-          "Past jobs were split into three rough types, mainly by parcel weight and traffic. "
-          "A new job is matched to the closest type. Think of them as handy labels, "
-          "not fixed categories.")
+          "Most jobs fit one of three types. Yours is matched to the closest one.")
     rows, profile_table = group_profiles()
     estimate = st.session_state.get("estimate")
     current = estimate["group"] if estimate else None
@@ -1012,21 +1005,20 @@ with tab_profiles:
     # Compare each group's average job with the usual (average) training job.
     usual = TRAIN[CLUSTER_FEATURES + [TARGET]].mean()
     spread = TRAIN[CLUSTER_FEATURES + [TARGET]].std()
-    WORDS = {  # (label, unit, word when above usual, word when below usual)
-        "distance_km": ("Distance", " km", "longer", "shorter"),
-        "weight_kg": ("Parcel weight", " kg", "heavier", "lighter"),
-        "traffic_index": ("Traffic", " / 5", "heavier", "lighter"),
-        "stops_count": ("Stops", "", "more", "fewer"),
+    TAGS = {  # plain words when a type is clearly above / below a usual job
+        "distance_km": ("Long trips", "Short trips"),
+        "weight_kg": ("Heavy parcels", "Light parcels"),
+        "traffic_index": ("Busy roads", "Quiet roads"),
+        "stops_count": ("Many stops", "Few stops"),
     }
 
-    def compare(field: str, value: float) -> str:
-        """A small pill: is this group's average clearly above, below or near usual?"""
-        z = (value - usual[field]) / spread[field]
-        if abs(z) < 0.35:
-            return '<span class="wb-diff same">≈ usual</span>'
-        _, _, more, less = WORDS[field]
-        return (f'<span class="wb-diff up">▲ {more}</span>' if z > 0
-                else f'<span class="wb-diff down">▼ {less}</span>')
+    def tags_for(r) -> list[str]:
+        out = []
+        for f, (more, less) in TAGS.items():
+            z = (r[f] - usual[f]) / spread[f]
+            if abs(z) >= 0.35:
+                out.append(more if z > 0 else less)
+        return out
 
     cols = st.columns(len(profile_table), gap="medium")
     for col, (g, r) in zip(cols, profile_table.iterrows()):
@@ -1034,26 +1026,16 @@ with tab_profiles:
             with card():
                 p = friendly_profile(g)
                 you = '<span class="wb-you">Your job</span><br>' if current == g else ""
-                rows_html = "".join(
-                    f'<div class="wb-prow"><span class="k">{WORDS[f][0]}</span>'
-                    f'<span class="v">{r[f]:.1f}{WORDS[f][1]}</span>{compare(f, r[f])}</div>'
-                    for f in CLUSTER_FEATURES)
+                tags = "".join(f'<span class="wb-tagpill">{esc(t)}</span>' for t in tags_for(r))
                 html(
                     f'{you}<div class="wb-pname">{p["icon"]} {esc(p["name"])}</div>'
-                    f'<div class="wb-note" style="margin-top:.2rem">{esc(p["what"])}</div>'
+                    f'<div class="wb-note" style="margin-top:.15rem">{esc(p["what"])}</div>'
                     f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
-                    f'<span class="wb-note">on average</span></div>'
-                    f'<div class="wb-note" style="margin-bottom:.7rem">{esc(p["timing"])}</div>'
-                    '<div class="wb-label" style="margin-bottom:.15rem">Compared with a usual job</div>'
-                    f"{rows_html}"
-                    f'<div class="wb-note" style="margin-top:.6rem;font-size:.78rem">'
-                    f'Group {g} · {p["jobs"]} of {len(TRAIN)} past jobs</div>'
+                    f'<span class="wb-note">usually · {p["timing"]}</span></div>'
+                    f'<div class="wb-row" style="margin-top:.4rem">{tags}</div>'
                 )
-    st.caption(
-        f"Numbers are averages for each type. A “usual” job is the average of all "
-        f"{len(TRAIN)} past jobs: {usual['distance_km']:.1f} km, {usual['weight_kg']:.1f} kg, "
-        f"traffic {usual['traffic_index']:.1f}, {usual['stops_count']:.1f} stops, "
-        f"{usual[TARGET]:.0f} min.")
+    st.caption(f"Times are averages from {len(TRAIN)} past jobs "
+               f"(a usual job takes about {usual[TARGET]:.0f} min).")
     if current is None:
         st.caption("Estimate a job in the first tab to see which type it is.")
 
@@ -1092,7 +1074,7 @@ with tab_profiles:
         shown = profile_table.drop(columns=["description"]).rename(columns={
             "distance_km": "km", "weight_kg": "kg", "traffic_index": "traffic",
             "stops_count": "stops", "minutes": "avg minutes"})
-        shown.index = [f"Group {g}" for g in shown.index]
+        shown.index = [f"{group_name(g)} (group {g})" for g in shown.index]
         st.dataframe(shown, use_container_width=True)
 
 # ==========================================================================
