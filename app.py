@@ -250,8 +250,42 @@ def group_profiles() -> tuple[pd.DataFrame, pd.DataFrame]:
     rows["group"] = CLUSTERS.predict(rows[CLUSTER_FEATURES])
     table = rows.groupby("group")[CLUSTER_FEATURES].mean().round(2)
     table.insert(0, "jobs", rows.groupby("group").size())
+    # Average duration is only used to describe each group; it was never a clustering input.
+    table["minutes"] = TRAIN[TARGET].groupby(rows["group"]).mean().round(1)
     table.insert(1, "description", [group_text(g) for g in table.index])
     return rows, table
+
+
+def friendly_profile(group: int) -> dict:
+    """Plain-English name and description for a group, worked out from its averages
+    compared with the usual (average) training job, so it always matches the numbers."""
+    _, table = group_profiles()
+    cols = CLUSTER_FEATURES + [TARGET]
+    usual, spread = TRAIN[cols].mean(), TRAIN[cols].std()
+    r = table.loc[group]
+    traffic_z = (r["traffic_index"] - usual["traffic_index"]) / spread["traffic_index"]
+    weight_z = (r["weight_kg"] - usual["weight_kg"]) / spread["weight_kg"]
+    if traffic_z >= 0.35:
+        icon, name, what = "🚦", "Traffic jobs", "Busy roads slow these jobs down."
+    elif weight_z >= 0.35:
+        icon, name, what = "📦", "Heavy loads", "Heavier parcels, usually on quiet roads."
+    elif weight_z <= -0.35:
+        icon, name, what = "🚀", "Quick drops", "Light parcels on quiet roads."
+    else:
+        icon, name, what = "🧭", "Everyday jobs", "Close to a typical job in every way."
+    gap = r["minutes"] - usual[TARGET]
+    fastest = table["minutes"].idxmin() == group
+    slowest = table["minutes"].idxmax() == group
+    if abs(gap) < 2:
+        timing = "They take about the usual time."
+    elif gap < 0:
+        timing = (f"The fastest jobs — about {abs(gap):.0f} min quicker than usual."
+                  if fastest else f"About {abs(gap):.0f} min quicker than usual.")
+    else:
+        timing = (f"The slowest jobs — about {gap:.0f} min longer than usual."
+                  if slowest else f"About {gap:.0f} min longer than usual.")
+    return {"icon": icon, "name": name, "what": what, "timing": timing,
+            "minutes": float(r["minutes"]), "jobs": int(r["jobs"])}
 
 
 @st.cache_data(show_spinner=False)
@@ -365,23 +399,39 @@ def build_snapshot(estimate: dict | None, counts: dict, topics: dict, n_scored: 
     return snap
 
 
+TOPIC_WORDS = {
+    "timeliness": "delivery times (late or delayed)",
+    "parcel": "the parcels (packages, damage)",
+    "service": "staff and service",
+    "none": "nothing in particular",
+}
+
+
 def offline_summary(snap: dict) -> str:
-    lines = ["OFFLINE SUMMARY  ·  fixed template, not AI-generated", ""]
+    """A plain-English report filled in by Python from the results (not written by AI)."""
+    lines = ["OFFLINE SUMMARY", "Written by the app from the results, not by AI.", ""]
+    lines.append("THIS JOB")
     if snap["estimated_duration_minutes"] is None:
-        lines.append("Estimated duration:  not calculated yet (use tab 1)")
+        lines.append("  No job checked yet. Use the first tab to get a time estimate.")
     else:
-        lines.append(f"Estimated duration:  {snap['estimated_duration_minutes']:.1f} minutes "
-                     f"({snap['vehicle']})")
-        lines.append(f"Delivery group:      {snap['delivery_group']} — {snap['group_description']}")
+        lines.append(f"  Expected time: about {snap['estimated_duration_minutes']:.0f} minutes "
+                     f"by {snap['vehicle']}")
+        try:
+            p = friendly_profile(int(snap["delivery_group"]))
+            lines.append(f"  Job type: {p['name']}. {p['what']}")
+        except Exception:  # noqa: BLE001
+            lines.append(f"  Job type: {snap['group_description']}")
     c = snap["sentiment_counts"]
+    topic = TOPIC_WORDS.get(snap["most_common_named_topic"], snap["most_common_named_topic"])
     lines += [
         "",
-        f"Customer comments scored: {snap['comments_scored']}",
-        f"  positive {c['positive']}   neutral {c['neutral']}   negative {c['negative']}",
-        f"Most common named topic: {snap['most_common_named_topic']}",
+        f"WHAT CUSTOMERS ARE SAYING ({snap['comments_scored']} comments)",
+        f"  Happy: {c['positive']}   Neutral: {c['neutral']}   Unhappy: {c['negative']}",
+        f"  Talked about most: {topic}",
         "",
-        "Demonstration results on generated classroom data.",
-        "The estimate is not a delivery guarantee.",
+        "GOOD TO KNOW",
+        "  These are practice results from classroom data.",
+        "  The time is an estimate, not a promise to the customer.",
     ]
     return "\n".join(lines)
 
@@ -412,20 +462,20 @@ def explain_api_error(exc: Exception) -> str:
         import groq
 
         if isinstance(exc, groq.RateLimitError):
-            return "The Groq free-plan rate limit was reached. Try again later."
+            return "The free AI service has reached its limit for now. Try again later."
         if isinstance(exc, groq.AuthenticationError):
-            return "The Groq API key was rejected. Check GROQ_API_KEY in Streamlit secrets."
+            return "The AI key in the app settings was not accepted."
         if isinstance(exc, groq.APITimeoutError):
-            return "The Groq request timed out after 20 seconds."
+            return "The AI took too long to reply."
         if isinstance(exc, groq.APIConnectionError):
-            return "Could not connect to Groq (network error)."
+            return "The app could not reach the AI service. Check the internet connection."
         if isinstance(exc, groq.APIStatusError):
-            return f"Groq returned an error (status {exc.status_code})."
+            return "The AI service had a problem (error " + str(exc.status_code) + ")."
     except ImportError:
-        return "The groq package is not installed."
+        return "The AI add-on (groq) is not installed."
     if isinstance(exc, ValueError):
-        return "Groq returned an empty response."
-    return f"The AI summary failed ({type(exc).__name__})."
+        return "The AI sent back an empty reply."
+    return "Something went wrong with the AI summary."
 
 
 html(
@@ -502,6 +552,21 @@ footer { visibility:hidden; }
 .wb-badge.neg { color:#DC2626; background:rgba(239,68,68,.13); border-color:rgba(239,68,68,.35); }
 .wb-badge.neu { background:rgba(148,163,184,.16); border-color:rgba(148,163,184,.4); }
 .wb-badge.warn { color:#B45309; background:rgba(245,158,11,.14); border-color:rgba(245,158,11,.4); }
+.wb-pname { font-size:1.02rem; font-weight:700; line-height:1.3; margin-top:.15rem; }
+.wb-ptime { display:flex; align-items:baseline; gap:.45rem; margin:.8rem 0 .2rem 0; }
+.wb-ptime .n { font-size:1.9rem; font-weight:800; letter-spacing:-.02em; color: var(--wb-accent);
+  font-variant-numeric: tabular-nums; }
+.wb-prow { display:flex; justify-content:space-between; align-items:center; gap:.5rem;
+  padding:.38rem 0; border-top:1px solid var(--wb-line); font-size:.88rem; }
+.wb-prow .k { opacity:.7; }
+.wb-prow .v { font-weight:600; font-variant-numeric: tabular-nums; margin-left:auto; }
+.wb-diff { font-size:.74rem; font-weight:600; padding:.12rem .5rem; border-radius:999px; white-space:nowrap;
+  min-width:5.6rem; text-align:center; }
+.wb-diff.up { color:#DC2626; background:rgba(239,68,68,.13); }
+.wb-diff.down { color:#16A34A; background:rgba(34,197,94,.13); }
+.wb-diff.same { opacity:.6; background:var(--wb-soft); }
+.wb-you { display:inline-block; font-size:.72rem; font-weight:700; color:#fff; padding:.15rem .55rem;
+  border-radius:999px; background: linear-gradient(135deg, var(--wb-accent2), var(--wb-accent)); margin-bottom:.35rem; }
 .wb-summary { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.88rem; line-height:1.7; }
 
 /* ---------- glass cards (only containers created with card()) ---------- */
@@ -675,8 +740,36 @@ def show_chart(chart) -> None:
 # --------------------------------------------------------------------------
 # Session defaults
 # --------------------------------------------------------------------------
+CUSTOM_JOB = "custom"
+FORM_FIELDS = ["distance_km", "weight_kg", "traffic_index", "stops_count", "vehicle"]
+
+
+def matching_example(record: dict) -> str | None:
+    """Return the example whose values equal the form, or None if nothing matches."""
+    for _, ex in EXAMPLES.iterrows():
+        try:
+            same = all(
+                str(record[f]).strip().lower() == str(ex[f]).strip().lower() if f == "vehicle"
+                else round(float(record[f]), 1) == round(float(ex[f]), 1)
+                for f in FORM_FIELDS
+            )
+        except (TypeError, ValueError):
+            same = False
+        if same:
+            return str(ex["record_id"])
+    return None
+
+
+def sync_example_choice() -> None:
+    """Runs whenever a job field changes: switch the picker to Custom job
+    (or back to an example if the values match one exactly)."""
+    st.session_state["example_id"] = matching_example(current_form_record()) or CUSTOM_JOB
+
+
 def load_example_into_form() -> None:
     record_id = st.session_state.get("example_id")
+    if record_id == CUSTOM_JOB:
+        return  # keep whatever the worker has typed
     row = EXAMPLES[EXAMPLES["record_id"] == record_id]
     if row.empty:
         return
@@ -706,14 +799,20 @@ def current_form_record() -> dict:
 
 
 def example_label(record_id: str) -> str:
+    if record_id == CUSTOM_JOB:
+        return "Custom job (your own values)"
     r = EXAMPLES[EXAMPLES["record_id"] == record_id].iloc[0]
     return (f"{record_id} — {r['distance_km']:g} km, {r['weight_kg']:g} kg, "
             f"traffic {int(r['traffic_index'])}, {int(r['stops_count'])} stops, {r['vehicle']}")
 
 
 def group_name(group: int) -> str:
-    """Short profile name, without the averages in brackets."""
-    return group_text(group).split(" (")[0]
+    """Short, plain-English profile name used across the app."""
+    try:
+        p = friendly_profile(int(group))
+        return f"{p['icon']} {p['name']}"
+    except Exception:  # noqa: BLE001 - fall back to the saved description
+        return group_text(group).split(" (")[0]
 
 
 # --------------------------------------------------------------------------
@@ -756,20 +855,26 @@ with tab_overview:
     form_col, result_col = st.columns([1, 1], gap="large")
     with form_col:
         with card():
-            st.selectbox("Start from an example", EXAMPLES["record_id"].tolist(),
+            st.selectbox("Start from an example",
+                         EXAMPLES["record_id"].tolist() + [CUSTOM_JOB],
                          key="example_id", on_change=load_example_into_form,
                          format_func=example_label)
             a, b = st.columns(2)
             a.number_input("Distance (km)", step=0.1, format="%.1f", key="f_distance_km",
+                           on_change=sync_example_choice,
                            help=f"Allowed {fmt_num(RANGES['distance_km'][0])}–"
                                 f"{fmt_num(RANGES['distance_km'][1])} km")
             b.number_input("Parcel weight (kg)", step=0.1, format="%.1f", key="f_weight_kg",
+                           on_change=sync_example_choice,
                            help=f"Allowed {fmt_num(RANGES['weight_kg'][0])}–"
                                 f"{fmt_num(RANGES['weight_kg'][1])} kg")
             a.number_input("Traffic (1–5)", step=1, key="f_traffic_index",
+                           on_change=sync_example_choice,
                            help="1 = light traffic, 5 = heavy traffic")
-            b.number_input("Stops (0–5)", step=1, key="f_stops_count")
+            b.number_input("Stops (0–5)", step=1, key="f_stops_count",
+                           on_change=sync_example_choice)
             st.selectbox("Vehicle", CATEGORIES["vehicle"], key="f_vehicle",
+                         on_change=sync_example_choice,
                          format_func=str.capitalize,
                          help="You can also confirm this in the Vehicle image tab.")
             estimate_clicked = st.button("Estimate duration", type="primary",
@@ -809,7 +914,7 @@ with tab_overview:
                     f'<span class="wb-tagpill">traffic {rec["traffic_index"]}</span>'
                     f'<span class="wb-tagpill">{rec["stops_count"]} stops</span>'
                     f'<span class="wb-tagpill">{esc(rec["vehicle"])}</span></div>'
-                    f'<div class="wb-group">Profile: <b>{esc(group_name(estimate["group"]))}</b>'
+                    f'<div class="wb-group">Job type: <b>{esc(group_name(estimate["group"]))}</b>'
                     f' <span class="wb-note">(group {estimate["group"]})</span></div>'
                 )
                 if validate_record(current_form_record())[0] != rec:
@@ -896,23 +1001,61 @@ with tab_overview:
 # Tab 2 — Delivery profiles (KMeans, 3 groups)
 # ==========================================================================
 with tab_profiles:
-    title("What kind of job is it?",
-          "Jobs are grouped into three profiles by distance, weight, traffic and stops.")
+    title("What type of job is this?",
+          "Past jobs were split into three rough types, mainly by parcel weight and traffic. "
+          "A new job is matched to the closest type. Think of them as handy labels, "
+          "not fixed categories.")
     rows, profile_table = group_profiles()
     estimate = st.session_state.get("estimate")
     current = estimate["group"] if estimate else None
+
+    # Compare each group's average job with the usual (average) training job.
+    usual = TRAIN[CLUSTER_FEATURES + [TARGET]].mean()
+    spread = TRAIN[CLUSTER_FEATURES + [TARGET]].std()
+    WORDS = {  # (label, unit, word when above usual, word when below usual)
+        "distance_km": ("Distance", " km", "longer", "shorter"),
+        "weight_kg": ("Parcel weight", " kg", "heavier", "lighter"),
+        "traffic_index": ("Traffic", " / 5", "heavier", "lighter"),
+        "stops_count": ("Stops", "", "more", "fewer"),
+    }
+
+    def compare(field: str, value: float) -> str:
+        """A small pill: is this group's average clearly above, below or near usual?"""
+        z = (value - usual[field]) / spread[field]
+        if abs(z) < 0.35:
+            return '<span class="wb-diff same">≈ usual</span>'
+        _, _, more, less = WORDS[field]
+        return (f'<span class="wb-diff up">▲ {more}</span>' if z > 0
+                else f'<span class="wb-diff down">▼ {less}</span>')
 
     cols = st.columns(len(profile_table), gap="medium")
     for col, (g, r) in zip(cols, profile_table.iterrows()):
         with col:
             with card():
-                marker = "  ← this job" if current == g else ""
-                st.markdown(f"**{group_name(g)}**{marker}")
-                st.caption(f"Group {g} · {int(r['jobs'])} jobs")
-                st.markdown(f"{r['distance_km']:.0f} km · {r['weight_kg']:.1f} kg  \n"
-                            f"traffic {r['traffic_index']:.1f} · {r['stops_count']:.1f} stops")
+                p = friendly_profile(g)
+                you = '<span class="wb-you">Your job</span><br>' if current == g else ""
+                rows_html = "".join(
+                    f'<div class="wb-prow"><span class="k">{WORDS[f][0]}</span>'
+                    f'<span class="v">{r[f]:.1f}{WORDS[f][1]}</span>{compare(f, r[f])}</div>'
+                    for f in CLUSTER_FEATURES)
+                html(
+                    f'{you}<div class="wb-pname">{p["icon"]} {esc(p["name"])}</div>'
+                    f'<div class="wb-note" style="margin-top:.2rem">{esc(p["what"])}</div>'
+                    f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
+                    f'<span class="wb-note">on average</span></div>'
+                    f'<div class="wb-note" style="margin-bottom:.7rem">{esc(p["timing"])}</div>'
+                    '<div class="wb-label" style="margin-bottom:.15rem">Compared with a usual job</div>'
+                    f"{rows_html}"
+                    f'<div class="wb-note" style="margin-top:.6rem;font-size:.78rem">'
+                    f'Group {g} · {p["jobs"]} of {len(TRAIN)} past jobs</div>'
+                )
+    st.caption(
+        f"Numbers are averages for each type. A “usual” job is the average of all "
+        f"{len(TRAIN)} past jobs: {usual['distance_km']:.1f} km, {usual['weight_kg']:.1f} kg, "
+        f"traffic {usual['traffic_index']:.1f}, {usual['stops_count']:.1f} stops, "
+        f"{usual[TARGET]:.0f} min.")
     if current is None:
-        st.caption("Estimate a job in the first tab to see which profile it belongs to.")
+        st.caption("Estimate a job in the first tab to see which type it is.")
 
     st.write("")
     plot = rows.assign(profile=rows["group"].map(lambda g: f"{g}: {group_name(g)}"))
@@ -948,7 +1091,7 @@ with tab_profiles:
                     "- Grouping similar jobs is not route optimisation and does not prove a cause.")
         shown = profile_table.drop(columns=["description"]).rename(columns={
             "distance_km": "km", "weight_kg": "kg", "traffic_index": "traffic",
-            "stops_count": "stops"})
+            "stops_count": "stops", "minutes": "avg minutes"})
         shown.index = [f"Group {g}" for g in shown.index]
         st.dataframe(shown, use_container_width=True)
 
@@ -1022,6 +1165,7 @@ with tab_image:
 
             def use_confirmed() -> None:
                 st.session_state["f_vehicle"] = st.session_state["img_confirm"]
+                sync_example_choice()  # vehicle changed from this tab too
 
             st.button("Use for the estimate", on_click=use_confirmed, type="primary",
                       use_container_width=True)
@@ -1179,7 +1323,8 @@ with tab_comments:
 # Tab 5 — Service summary (offline by default, optional Groq Free Plan)
 # ==========================================================================
 with tab_summary:
-    title("Service summary", "A short summary of the results — no API key needed.")
+    title("Service summary",
+          "A short report on this job and what customers are saying. Works without internet.")
 
     analyser_ok = load_sentiment_analyser()[0] is not None
     if analyser_ok:
@@ -1190,7 +1335,7 @@ with tab_summary:
     snapshot = build_snapshot(estimate, counts, topics, n_scored)
     offline_text = offline_summary(snapshot)
 
-    mode = st.radio("Summary type", ["Offline summary", "AI summary · Groq Free Plan"],
+    mode = st.radio("Summary type", ["Offline summary", "AI summary (optional)"],
                     horizontal=True, key="summary_mode", label_visibility="collapsed")
 
     def show_offline() -> None:
@@ -1201,7 +1346,7 @@ with tab_summary:
                            file_name="waybill_offline_summary.txt", mime="text/plain")
 
     if estimate is None:
-        st.caption("Tip: estimate a job in the first tab to include it in the summary.")
+        st.caption("Estimate a job in the first tab to add it to this summary.")
 
     if mode == "Offline summary":
         show_offline()
@@ -1212,11 +1357,12 @@ with tab_summary:
 
         g1, g2 = st.columns([2, 1], gap="large")
         with g1:
-            st.caption("Sends one request with the calculated totals only — no comment text, "
-                       "images or files. Asks for one observation, two actions and one "
-                       f"limitation in under 120 words. Model: {model_id}. Key: "
-                       f"{'set' if api_key else 'not set'}.")
-            simulate_failure = st.toggle("Test mode: simulate an API failure", value=False,
+            st.caption("The AI gets only the numbers from this page, never customer comments, "
+                       "photos or files. It writes one finding, two suggestions and one "
+                       "caution in under 120 words. "
+                       + ("AI is set up." if api_key else
+                          "AI is not set up yet, so you will see the offline summary."))
+            simulate_failure = st.toggle("Practice: pretend the AI is unavailable", value=False,
                                          key="simulate_failure")
         with g2:
             generate = st.button("Generate AI summary", type="primary",
@@ -1225,7 +1371,7 @@ with tab_summary:
         if generate:
             try:
                 if simulate_failure:
-                    raise RuntimeError("Simulated free-plan rate limit (test mode)")
+                    raise RuntimeError("This is a practice run of the AI being unavailable")
                 if not api_key:
                     raise LookupError("missing key")
                 text = call_groq(snapshot, api_key, model_id)
@@ -1233,8 +1379,8 @@ with tab_summary:
                                                   "time": datetime.now().strftime("%H:%M")}
                 st.session_state["ai_error"] = None
             except LookupError:
-                st.session_state["ai_error"] = ("No Groq API key is set (add GROQ_API_KEY "
-                                                "in the Streamlit secrets).")
+                st.session_state["ai_error"] = ("The AI has not been set up yet "
+                                                "(no GROQ_API_KEY in the app settings).")
             except RuntimeError as exc:
                 st.session_state["ai_error"] = f"{exc}."
             except Exception as exc:  # noqa: BLE001
@@ -1243,25 +1389,28 @@ with tab_summary:
         ai_error = st.session_state.get("ai_error")
         ai = st.session_state.get("ai_summary")
         if ai_error:
-            st.warning(f"**AI summary unavailable.** {ai_error} Here is the offline summary "
-                       "instead — everything else still works.")
+            st.warning(f"**The AI summary isn't available.** {ai_error} "
+                       "Here is the offline summary instead. Everything else still works.")
             show_offline()
         elif ai:
             if ai["key"] != snap_key:
-                st.info("The results changed after this summary was made. Generate again to "
-                        "update it.")
+                st.info("The results have changed since this was written. Press "
+                        "**Generate AI summary** again to update it.")
             with card():
-                st.caption(f"AI-generated · Groq · {ai['time']} · {len(ai['text'].split())} words")
+                st.caption(f"Written by AI at {ai['time']} · {len(ai['text'].split())} words")
                 st.markdown(ai["text"])
-            st.caption("AI text can contain mistakes — check numbers against the offline "
-                       "summary, which comes straight from the models.")
+            st.caption("AI can make mistakes. Check its numbers against the offline summary, "
+                       "which comes straight from the results.")
             with st.expander("Offline summary"):
                 show_offline()
 
-        with st.expander("What will be sent"):
+        with st.expander("See exactly what is sent to the AI"):
             st.json(snapshot)
 
-    with st.expander("Prompt comparison from the notebook"):
+    with st.expander("How we chose the AI instructions"):
+        st.caption("We tested a vague request (\"Give advice\") against clear, structured "
+                   "instructions on five practice cases. The structured version was shorter, "
+                   "stuck to the real numbers and stayed on topic.")
         counts_table = read_optional_csv(REPORTS / "prompt_pass_counts.csv")
         if counts_table is not None:
             st.dataframe(counts_table, hide_index=True, use_container_width=True)
