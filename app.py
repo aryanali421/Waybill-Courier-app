@@ -39,7 +39,7 @@ SAMPLES = BASE / "sample_images"
 NLTK_DIR = BASE / "nltk_data"
 
 APP_NAME = "Waybill"
-APP_VERSION = "1.5 (animated cards)"
+APP_VERSION = "2.0"
 MAX_COMMENT_CHARS = 1000
 MAX_UPLOAD_MB = 5
 MAX_CSV_ROWS = 200
@@ -1048,36 +1048,84 @@ with tab_profiles:
     def traffic_word(level: float) -> str:
         return "Quiet" if level < 2.5 else ("Busy" if level > 3.5 else "Medium")
 
-    cols = st.columns(len(profile_table), gap="medium")
-    for col, (g, r) in zip(cols, profile_table.iterrows()):
-        with col:
-            with card():
-                p = friendly_profile(g)
-                you = '<span class="wb-you">Your job</span>' if current == g else ""
-                info = [
-                    ("Weight", f"{r['weight_kg']:.1f} kg on average"),
-                    ("Traffic", f"{traffic_word(r['traffic_index'])} ({r['traffic_index']:.1f} of 5)"),
-                    ("Distance", f"about {r['distance_km']:.0f} km"),
-                    ("Stops", f"about {r['stops_count']:.0f}"),
-                ]
-                rows_html = "".join(f'<span class="k">{k}</span><span class="v">{esc(v)}</span>'
-                                    for k, v in info)
-                # Every part has a fixed height (inline, so no style sheet can change it):
-                # all three cards always come out exactly the same size.
-                html(
-                    '<div class="wb-pcard" style="height:300px;overflow:hidden;'
-                    'display:flex;flex-direction:column">'
-                    f'<div style="height:1.6rem;flex:none">{you}</div>'
-                    f'<div class="wb-pname" style="height:1.4rem;flex:none;white-space:nowrap;'
-                    f'overflow:hidden;text-overflow:ellipsis"><span class="wb-picon">{p["icon"]}</span> '
-                    f'{esc(p["name"])}</div>'
-                    f'<div class="wb-note" style="height:2.8rem;flex:none;overflow:hidden;'
-                    f'line-height:1.4rem;margin-top:.15rem">{esc(p["what"])}</div>'
-                    f'<div class="wb-ptime" style="flex:none"><span class="n">{p["minutes"]:.0f} min</span>'
-                    f'<span class="wb-note">usually · {p["timing"]}</span></div>'
-                    f'<div class="wb-info" style="flex:none">{rows_html}</div>'
-                    '</div>'
-                )
+    # All three cards are drawn in ONE grid. A CSS grid row always makes its boxes the
+    # same height, so the cards are always the same size, whatever text they hold.
+    # The grid carries its own styles and animations, so nothing else can override them.
+    JOB_CSS = """
+<style>
+.wb-jobgrid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:1rem;
+  align-items:stretch; margin:.6rem 0 .8rem 0; }
+@media (max-width: 760px) { .wb-jobgrid { grid-template-columns:1fr; } }
+.wb-jobgrid .wb-job { position:relative; display:flex; flex-direction:column;
+  padding:1.15rem 1.25rem 1rem 1.25rem; border-radius:18px; background:var(--wb-glass);
+  border:1px solid var(--wb-line); box-shadow:var(--wb-shadow);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  animation:wbJobIn .8s cubic-bezier(.16,1,.3,1) both !important;
+  animation-delay:calc(var(--i) * .13s) !important;
+  transition:transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s ease,
+    border-color .4s ease !important; }
+.wb-jobgrid .wb-job:hover { transform:translateY(-6px); border-color:rgba(234,88,12,.55);
+  box-shadow:0 20px 44px rgba(0,0,0,.30); }
+.wb-jobgrid .wb-job.is-you { border-color:rgba(234,88,12,.75); }
+.wb-jobgrid .wb-job .you { position:absolute; top:-.65rem; right:1rem; font-size:.7rem; font-weight:700;
+  color:#fff; padding:.2rem .6rem; border-radius:999px;
+  background:linear-gradient(135deg, #F97316, #EA580C);
+  animation:wbJobGlow 2.4s ease-in-out infinite !important; }
+.wb-jobgrid .wb-job .nm { font-size:1.05rem; font-weight:700; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.wb-jobgrid .wb-job .ic { display:inline-block;
+  transition:transform .5s cubic-bezier(.16,1,.3,1) !important; }
+.wb-jobgrid .wb-job:hover .ic { transform:translateY(-3px) rotate(-10deg) scale(1.2); }
+.wb-jobgrid .wb-job .ds { font-size:.86rem; opacity:.7; margin-top:.2rem; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.wb-jobgrid .wb-job .tm { display:flex; align-items:baseline; gap:.45rem; margin:.9rem 0 .8rem 0; }
+.wb-jobgrid .wb-job .tm b { display:inline-block; font-size:2rem; font-weight:800; color:#EA580C;
+  letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+  animation:wbJobPop .9s cubic-bezier(.16,1,.3,1) both !important;
+  animation-delay:calc(var(--i) * .13s + .25s) !important;
+  transition:transform .4s ease, text-shadow .4s ease !important; }
+.wb-jobgrid .wb-job:hover .tm b { transform:scale(1.08); text-shadow:0 0 18px rgba(234,88,12,.5); }
+.wb-jobgrid .wb-job .tm span { font-size:.85rem; opacity:.65; }
+.wb-jobgrid .wb-job .rows { display:grid; grid-template-columns:auto 1fr; gap:.42rem .9rem;
+  margin-top:auto; padding-top:.75rem; border-top:1px solid var(--wb-line); font-size:.88rem; }
+.wb-jobgrid .wb-job .rows > span { animation:wbJobRow .55s cubic-bezier(.16,1,.3,1) both !important;
+  animation-delay:calc(var(--i) * .13s + .35s + var(--r) * .07s) !important; }
+.wb-jobgrid .wb-job .rows .k { opacity:.6; }
+.wb-jobgrid .wb-job .rows .v { font-weight:600; text-align:right; font-variant-numeric:tabular-nums; }
+@keyframes wbJobIn { from { opacity:0; transform:translate3d(0,22px,0) scale(.96); }
+  to { opacity:1; transform:none; } }
+@keyframes wbJobPop { 0% { opacity:0; transform:scale(.8); } 60% { opacity:1; transform:scale(1.06); }
+  100% { opacity:1; transform:none; } }
+@keyframes wbJobRow { from { opacity:0; transform:translate3d(0,6px,0); } to { opacity:1; transform:none; } }
+@keyframes wbJobGlow { 0%, 100% { box-shadow:0 0 0 0 rgba(234,88,12,0); }
+  50% { box-shadow:0 0 0 6px rgba(234,88,12,.25); } }
+</style>
+"""
+    cards = []
+    for i, (g, r) in enumerate(profile_table.iterrows()):
+        p = friendly_profile(g)
+        info = [
+            ("Weight", f"{r['weight_kg']:.1f} kg on average"),
+            ("Traffic", f"{traffic_word(r['traffic_index'])} ({r['traffic_index']:.1f} of 5)"),
+            ("Distance", f"about {r['distance_km']:.0f} km"),
+            ("Stops", f"about {r['stops_count']:.0f}"),
+        ]
+        rows_html = "".join(
+            f'<span class="k" style="--r:{n}">{k}</span>'
+            f'<span class="v" style="--r:{n}">{esc(v)}</span>'
+            for n, (k, v) in enumerate(info))
+        is_you = current == g
+        cards.append(
+            f'<div class="wb-job{" is-you" if is_you else ""}" style="--i:{i}">'
+            + ('<span class="you">Your job</span>' if is_you else "")
+            + f'<div class="nm"><span class="ic">{p["icon"]}</span> {esc(p["name"])}</div>'
+            f'<div class="ds">{esc(p["what"])}</div>'
+            f'<div class="tm"><b>{p["minutes"]:.0f} min</b>'
+            f'<span>usually · {p["timing"]}</span></div>'
+            f'<div class="rows">{rows_html}</div>'
+            "</div>"
+        )
+    html(JOB_CSS + '<div class="wb-jobgrid">' + "".join(cards) + "</div>")
     st.caption(f"Times are averages from {len(TRAIN)} past jobs "
                f"(a usual job takes about {usual[TARGET]:.0f} min).")
     if current is None:
