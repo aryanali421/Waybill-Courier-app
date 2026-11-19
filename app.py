@@ -252,6 +252,9 @@ def group_profiles() -> tuple[pd.DataFrame, pd.DataFrame]:
     table.insert(0, "jobs", rows.groupby("group").size())
     # Average duration is only used to describe each group; it was never a clustering input.
     table["minutes"] = TRAIN[TARGET].groupby(rows["group"]).mean().round(1)
+    # Typical weight range = the middle half of the jobs in each group (25th–75th percentile).
+    table["w_lo"] = rows.groupby("group")["weight_kg"].quantile(0.25).round(0)
+    table["w_hi"] = rows.groupby("group")["weight_kg"].quantile(0.75).round(0)
     table.insert(1, "description", [group_text(g) for g in table.index])
     return rows, table
 
@@ -265,14 +268,15 @@ def friendly_profile(group: int) -> dict:
     r = table.loc[group]
     traffic_z = (r["traffic_index"] - usual["traffic_index"]) / spread["traffic_index"]
     weight_z = (r["weight_kg"] - usual["weight_kg"]) / spread["weight_kg"]
+    w = f"{r['w_lo']:.0f}–{r['w_hi']:.0f} kg"
     if traffic_z >= 0.35:
-        icon, name, what = "🚦", "Traffic jobs", "Busy roads slow these down."
+        icon, name, what = "🚦", "Mixed weights, busy roads", f"Parcels of all sizes (mostly {w}) on busy roads."
     elif weight_z >= 0.35:
-        icon, name, what = "📦", "Heavy loads", "Big parcels, quiet roads."
+        icon, name, what = "📦", "Heavy parcels", f"Mostly {w}, on quiet roads."
     elif weight_z <= -0.35:
-        icon, name, what = "🚀", "Quick drops", "Small parcels, quiet roads."
+        icon, name, what = "✉️", "Light parcels", f"Mostly {w}, on quiet roads."
     else:
-        icon, name, what = "🧭", "Everyday jobs", "A typical job."
+        icon, name, what = "🧭", "Medium parcels", f"Mostly {w}, normal roads."
     if table["minutes"].idxmin() == group:
         timing = "fastest"
     elif table["minutes"].idxmax() == group:
@@ -547,6 +551,10 @@ footer { visibility:hidden; }
 .wb-badge.neg { color:#DC2626; background:rgba(239,68,68,.13); border-color:rgba(239,68,68,.35); }
 .wb-badge.neu { background:rgba(148,163,184,.16); border-color:rgba(148,163,184,.4); }
 .wb-badge.warn { color:#B45309; background:rgba(245,158,11,.14); border-color:rgba(245,158,11,.4); }
+.wb-info { display:grid; grid-template-columns:auto 1fr; gap:.35rem .9rem; font-size:.88rem;
+  padding:.7rem 0 .2rem 0; border-top:1px solid var(--wb-line); margin-top:.5rem; }
+.wb-info .k { opacity:.6; }
+.wb-info .v { font-weight:600; text-align:right; font-variant-numeric: tabular-nums; }
 .wb-pname { font-size:1.02rem; font-weight:700; line-height:1.3; margin-top:.15rem; }
 .wb-ptime { display:flex; align-items:baseline; gap:.45rem; margin:.8rem 0 .2rem 0; }
 .wb-ptime .n { font-size:1.9rem; font-weight:800; letter-spacing:-.02em; color: var(--wb-accent);
@@ -1005,20 +1013,8 @@ with tab_profiles:
     # Compare each group's average job with the usual (average) training job.
     usual = TRAIN[CLUSTER_FEATURES + [TARGET]].mean()
     spread = TRAIN[CLUSTER_FEATURES + [TARGET]].std()
-    TAGS = {  # plain words when a type is clearly above / below a usual job
-        "distance_km": ("Long trips", "Short trips"),
-        "weight_kg": ("Heavy parcels", "Light parcels"),
-        "traffic_index": ("Busy roads", "Quiet roads"),
-        "stops_count": ("Many stops", "Few stops"),
-    }
-
-    def tags_for(r) -> list[str]:
-        out = []
-        for f, (more, less) in TAGS.items():
-            z = (r[f] - usual[f]) / spread[f]
-            if abs(z) >= 0.35:
-                out.append(more if z > 0 else less)
-        return out
+    def traffic_word(level: float) -> str:
+        return "Quiet" if level < 2.5 else ("Busy" if level > 3.5 else "Medium")
 
     cols = st.columns(len(profile_table), gap="medium")
     for col, (g, r) in zip(cols, profile_table.iterrows()):
@@ -1026,13 +1022,20 @@ with tab_profiles:
             with card():
                 p = friendly_profile(g)
                 you = '<span class="wb-you">Your job</span><br>' if current == g else ""
-                tags = "".join(f'<span class="wb-tagpill">{esc(t)}</span>' for t in tags_for(r))
+                info = [
+                    ("Weight", f"{r['weight_kg']:.1f} kg on average"),
+                    ("Traffic", f"{traffic_word(r['traffic_index'])} ({r['traffic_index']:.1f} of 5)"),
+                    ("Distance", f"about {r['distance_km']:.0f} km"),
+                    ("Stops", f"about {r['stops_count']:.0f}"),
+                ]
+                rows_html = "".join(f'<span class="k">{k}</span><span class="v">{esc(v)}</span>'
+                                    for k, v in info)
                 html(
                     f'{you}<div class="wb-pname">{p["icon"]} {esc(p["name"])}</div>'
                     f'<div class="wb-note" style="margin-top:.15rem">{esc(p["what"])}</div>'
                     f'<div class="wb-ptime"><span class="n">{p["minutes"]:.0f} min</span>'
                     f'<span class="wb-note">usually · {p["timing"]}</span></div>'
-                    f'<div class="wb-row" style="margin-top:.4rem">{tags}</div>'
+                    f'<div class="wb-info">{rows_html}</div>'
                 )
     st.caption(f"Times are averages from {len(TRAIN)} past jobs "
                f"(a usual job takes about {usual[TARGET]:.0f} min).")
@@ -1071,7 +1074,7 @@ with tab_profiles:
                     "chosen from the averages in original units.\n"
                     "- Group numbers are labels, not a ranking.\n"
                     "- Grouping similar jobs is not route optimisation and does not prove a cause.")
-        shown = profile_table.drop(columns=["description"]).rename(columns={
+        shown = profile_table.drop(columns=["description", "w_lo", "w_hi"]).rename(columns={
             "distance_km": "km", "weight_kg": "kg", "traffic_index": "traffic",
             "stops_count": "stops", "minutes": "avg minutes"})
         shown.index = [f"{group_name(g)} (group {g})" for g in shown.index]
